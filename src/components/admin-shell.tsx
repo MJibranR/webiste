@@ -27,6 +27,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
     { to: "/admin/users", label: "USERS" },
     { to: "/admin/content", label: "SITE CONTENT" },
     { to: "/admin/notifications", label: "NOTIFICATIONS" },
+    { to: "/admin/activity", label: "ACTIVITY" },
   ] as const;
 
   return (

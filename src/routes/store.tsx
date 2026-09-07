@@ -14,6 +14,7 @@ import {
   uid,
   waLink,
   pushNotification,
+  logActivity,
   type Product,
 } from "@/lib/spiderhex";
 
@@ -59,6 +60,7 @@ function StorePage() {
       "ORDER RECEIVED",
       `Your order for ${product.name} ($${product.price}) was logged. We'll send your download link shortly.`,
     );
+    logActivity("purchase", user.email, `Ordered ${product.name} for $${product.price}`);
     return purchase;
   };
 
@@ -107,6 +109,14 @@ function StorePage() {
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {list.map((p) => (
             <article key={p.id} className="panel flex flex-col p-5 transition hover:-translate-y-1 hover:border-primary">
+              {p.imageUrl ? (
+                <img
+                  src={p.imageUrl}
+                  alt={`${p.name} panel`}
+                  loading="lazy"
+                  className="mb-4 h-36 w-full rounded border border-border object-cover"
+                />
+              ) : null}
               <div className="flex items-start justify-between">
                 <span className="rounded border border-gold/50 px-2 py-1 text-[10px] text-gold">{p.badge || "NEW"}</span>
                 <span className="text-[10px] text-muted-foreground">{p.category}</span>
