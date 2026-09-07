@@ -27,22 +27,20 @@ function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     if (!identifier || !password) return setError("ALL FIELDS REQUIRED");
     if (!verified) return setError("COMPLETE HUMAN VERIFICATION");
     setLoading(true);
-    window.setTimeout(() => {
-      const res = login(identifier, password);
-      setLoading(false);
-      if (!res.ok) {
-        setError(res.error ?? "LOGIN FAILED");
-        return;
-      }
-      toast.success("ACCESS GRANTED");
-      navigate({ to: identifier.trim().toLowerCase() === "admin@spiderhex.com" ? "/admin" : "/dashboard" });
-    }, 500);
+    const res = await login(identifier, password);
+    setLoading(false);
+    if (!res.ok) {
+      setError(res.error ?? "LOGIN FAILED");
+      return;
+    }
+    toast.success("ACCESS GRANTED");
+    navigate({ to: identifier.trim().toLowerCase() === "admin@spiderhex.com" ? "/admin" : "/dashboard" });
   };
 
   return (
@@ -50,11 +48,11 @@ function LoginPage() {
       <Scanlines />
       <MatrixRain />
       <Logo />
-      <form onSubmit={submit} className="panel mt-6 w-full max-w-md p-7">
+      <form onSubmit={(e) => void submit(e)} className="panel mt-6 w-full max-w-md p-7">
         <h1 className="glow-text text-lg font-bold tracking-[0.2em] text-primary">LOGIN</h1>
         <p className="mt-1 text-xs text-muted-foreground">// AUTHENTICATE TO CONTINUE</p>
 
-        <label className="mt-6 block text-[11px] tracking-[0.2em] text-muted-foreground">EMAIL / USERNAME</label>
+        <label className="mt-6 block text-[11px] tracking-[0.2em] text-muted-foreground">EMAIL</label>
         <input
           value={identifier}
           onChange={(e) => setIdentifier(e.target.value)}
