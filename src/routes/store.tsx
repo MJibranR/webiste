@@ -14,6 +14,7 @@ import {
   uid,
   waLink,
   pushNotification,
+  logActivity,
   type Product,
 } from "@/lib/spiderhex";
 
@@ -59,6 +60,7 @@ function StorePage() {
       "ORDER RECEIVED",
       `Your order for ${product.name} ($${product.price}) was logged. We'll send your download link shortly.`,
     );
+    logActivity("purchase", user.email, `Ordered ${product.name} for $${product.price}`);
     return purchase;
   };
 

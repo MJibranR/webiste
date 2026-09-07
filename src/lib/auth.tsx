@@ -6,6 +6,7 @@ import {
   setSessionId,
   setUsers,
   uid,
+  logActivity,
   type User,
 } from "./spiderhex";
 
@@ -55,6 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (found.password !== password) return { ok: false, error: "INVALID PASSWORD" };
       setSessionId(found.id);
       setUser(found);
+      logActivity("login", found.email, `${found.fullName} signed in`);
       return { ok: true };
     },
     [],
@@ -81,13 +83,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUsers([...users, newUser]);
     setSessionId(newUser.id);
     setUser(newUser);
+    logActivity("signup", newUser.email, `${newUser.fullName} created an account`);
     return { ok: true };
   }, []);
 
   const logout = useCallback(() => {
+    if (user) logActivity("logout", user.email, `${user.fullName} signed out`);
     setSessionId(null);
     setUser(null);
-  }, []);
+  }, [user]);
 
   const value = useMemo(
     () => ({ user, loading, login, signup, logout, refresh }),
