@@ -1,95 +1,139 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import {
-  ensureSeed,
-  getSessionId,
-  getUsers,
-  setSessionId,
-  setUsers,
-  uid,
-  logActivity,
-  type User,
-} from "./spiderhex";
+import { supabase } from "@/integrations/supabase/client";
+import { logActivity, type User } from "./spiderhex";
 
 interface AuthValue {
   user: User | null;
   loading: boolean;
-  login: (identifier: string, password: string) => { ok: boolean; error?: string };
+  login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
   signup: (data: {
     fullName: string;
     email: string;
     whatsapp: string;
     password: string;
-  }) => { ok: boolean; error?: string };
-  logout: () => void;
-  refresh: () => void;
+  }) => Promise<{ ok: boolean; error?: string; pending?: boolean }>;
+  logout: () => Promise<void>;
+  refresh: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthValue | null>(null);
+
+/** Reads the signed-in member's profile + role from the database. */
+export async function loadCurrentUser(): Promise<User | null> {
+  const { data: auth } = await supabase.auth.getUser();
+  const authUser = auth.user;
+  if (!authUser) return null;
+
+  const meta = (authUser.user_metadata ?? {}) as Record<string, string>;
+  await supabase.rpc("ensure_profile", {
+    _full_name: meta["full_name"] ?? "",
+    _whatsapp: meta["whatsapp"] ?? "",
+    _username: meta["username"] ?? "",
+  });
+
+  const [{ data: profile }, { data: roles }] = await Promise.all([
+    supabase.from("profiles").select("*").eq("id", authUser.id).maybeSingle(),
+    supabase.from("user_roles").select("role").eq("user_id", authUser.id),
+  ]);
+
+  const email = profile?.email ?? authUser.email ?? "";
+  return {
+    id: authUser.id,
+    email,
+    fullName: profile?.full_name ?? meta["full_name"] ?? email,
+    whatsapp: profile?.whatsapp ?? meta["whatsapp"] ?? "",
+    role: roles?.some((r) => r.role === "admin") ? "admin" : "user",
+    balance: Number(profile?.balance ?? 0),
+    totalSpent: Number(profile?.total_spent ?? 0),
+    level: profile?.level ?? 1,
+    xp: profile?.xp ?? 0,
+    username: profile?.username ?? email.split("@")[0] ?? "hunter",
+  };
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const refresh = useCallback(() => {
-    const id = getSessionId();
-    const found = id ? getUsers().find((u) => u.id === id) ?? null : null;
-    setUser(found);
+  const refresh = useCallback(async () => {
+    setUser(await loadCurrentUser());
   }, []);
 
   useEffect(() => {
-    ensureSeed();
-    refresh();
-    setLoading(false);
-    const handler = () => refresh();
+    let active = true;
+
+    void (async () => {
+      const found = await loadCurrentUser();
+      if (active) {
+        setUser(found);
+        setLoading(false);
+      }
+    })();
+
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
+      void (async () => {
+        const found = await loadCurrentUser();
+        if (active) setUser(found);
+      })();
+    });
+
+    const handler = () => void refresh();
     window.addEventListener("sh:update", handler);
-    return () => window.removeEventListener("sh:update", handler);
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
+      window.removeEventListener("sh:update", handler);
+    };
   }, [refresh]);
 
-  const login: AuthValue["login"] = useCallback(
-    (identifier, password) => {
-      ensureSeed();
-      const key = identifier.trim().toLowerCase();
-      const found = getUsers().find(
-        (u) => u.email.toLowerCase() === key || u.username.toLowerCase() === key,
-      );
-      if (!found) return { ok: false, error: "ACCOUNT NOT FOUND" };
-      if (found.password !== password) return { ok: false, error: "INVALID PASSWORD" };
-      setSessionId(found.id);
-      setUser(found);
-      logActivity("login", found.email, `${found.fullName} signed in`);
-      return { ok: true };
-    },
-    [],
-  );
-
-  const signup: AuthValue["signup"] = useCallback((data) => {
-    ensureSeed();
-    const users = getUsers();
-    if (users.some((u) => u.email.toLowerCase() === data.email.trim().toLowerCase()))
-      return { ok: false, error: "EMAIL ALREADY REGISTERED" };
-    const newUser: User = {
-      id: uid(),
-      email: data.email.trim(),
-      fullName: data.fullName.trim(),
-      whatsapp: data.whatsapp.trim(),
-      password: data.password,
-      role: "user",
-      balance: 0,
-      totalSpent: 0,
-      level: 1,
-      xp: 0,
-      username: data.fullName.trim().toLowerCase().replace(/\s+/g, "_") || "hunter",
-    };
-    setUsers([...users, newUser]);
-    setSessionId(newUser.id);
-    setUser(newUser);
-    logActivity("signup", newUser.email, `${newUser.fullName} created an account`);
+  const login: AuthValue["login"] = useCallback(async (email, password) => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    });
+    if (error) {
+      const msg = /confirm/i.test(error.message)
+        ? "EMAIL NOT CONFIRMED — CHECK YOUR INBOX"
+        : "WRONG EMAIL OR PASSWORD";
+      return { ok: false, error: msg };
+    }
+    const found = await loadCurrentUser();
+    setUser(found);
+    if (found) logActivity("login", found.email, `${found.fullName} signed in`);
     return { ok: true };
   }, []);
 
-  const logout = useCallback(() => {
+  const signup: AuthValue["signup"] = useCallback(async (data) => {
+    const email = data.email.trim().toLowerCase();
+    const { data: res, error } = await supabase.auth.signUp({
+      email,
+      password: data.password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/login`,
+        data: {
+          full_name: data.fullName.trim(),
+          whatsapp: data.whatsapp.trim(),
+          username: data.fullName.trim().toLowerCase().replace(/\s+/g, "_") || "hunter",
+        },
+      },
+    });
+    if (error) {
+      const msg = /already/i.test(error.message)
+        ? "EMAIL ALREADY REGISTERED"
+        : error.message.toUpperCase();
+      return { ok: false, error: msg };
+    }
+    logActivity("signup", email, `${data.fullName.trim() || email} created an account`);
+    if (!res.session) return { ok: true, pending: true };
+    const found = await loadCurrentUser();
+    setUser(found);
+    return { ok: true };
+  }, []);
+
+  const logout = useCallback(async () => {
     if (user) logActivity("logout", user.email, `${user.fullName} signed out`);
-    setSessionId(null);
+    await supabase.auth.signOut();
     setUser(null);
   }, [user]);
 
