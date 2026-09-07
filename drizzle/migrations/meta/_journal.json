@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1788794113296,
+      "tag": "0000_create_core_tables_and_seed_products",
+      "breakpoints": true
+    }
+  ]
+}
