@@ -5,7 +5,7 @@ export interface User {
   email: string;
   fullName: string;
   whatsapp: string;
-  password: string;
+  password?: string;
   role: Role;
   balance: number;
   totalSpent: number;

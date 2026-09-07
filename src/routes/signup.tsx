@@ -34,7 +34,7 @@ function SignupPage() {
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     if (!form.fullName || !form.email || !form.whatsapp || !form.password) return setError("ALL FIELDS REQUIRED");
@@ -42,13 +42,19 @@ function SignupPage() {
     if (form.password !== form.confirm) return setError("PASSWORDS DO NOT MATCH");
     if (input.trim().toUpperCase() !== key) return setError("VERIFICATION KEY INCORRECT");
     setLoading(true);
-    window.setTimeout(() => {
-      const res = signup(form);
-      setLoading(false);
-      if (!res.ok) return setError(res.error ?? "SIGNUP FAILED");
-      toast.success("ACCOUNT CREATED");
-      navigate({ to: "/dashboard" });
-    }, 500);
+    const res = await signup(form);
+    setLoading(false);
+    if (!res.ok) {
+      setError(res.error ?? "SIGNUP FAILED");
+      return;
+    }
+    if (res.pending) {
+      toast.success("CHECK YOUR EMAIL TO CONFIRM YOUR ACCOUNT");
+      navigate({ to: "/login" });
+      return;
+    }
+    toast.success("ACCOUNT CREATED");
+    navigate({ to: "/dashboard" });
   };
 
   const field = "mt-2 w-full rounded border border-input bg-surface px-3 py-3 text-sm outline-none focus:border-primary";
@@ -59,7 +65,7 @@ function SignupPage() {
       <Scanlines />
       <MatrixRain />
       <Logo />
-      <form onSubmit={submit} className="panel mt-6 w-full max-w-md p-7">
+      <form onSubmit={(e) => void submit(e)} className="panel mt-6 w-full max-w-md p-7">
         <h1 className="glow-text text-lg font-bold tracking-[0.2em] text-primary">CREATE ACCOUNT</h1>
         <p className="mt-1 text-xs text-muted-foreground">// JOIN THE HEX NETWORK</p>
 
