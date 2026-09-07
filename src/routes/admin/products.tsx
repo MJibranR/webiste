@@ -110,6 +110,20 @@ function ProductsAdmin() {
               value={draft.downloadLink}
               onChange={(e) => setDraft({ ...draft, downloadLink: e.target.value })}
             />
+            <input
+              className={`${field} sm:col-span-2`}
+              placeholder="PANEL IMAGE ADDRESS (OPTIONAL)"
+              value={draft.imageUrl ?? ""}
+              onChange={(e) => setDraft({ ...draft, imageUrl: e.target.value })}
+            />
+            {draft.imageUrl ? (
+              <img
+                src={draft.imageUrl}
+                alt={`${draft.name || "Panel"} preview`}
+                loading="lazy"
+                className="h-28 w-full rounded border border-border object-cover sm:col-span-2"
+              />
+            ) : null}
           </div>
           <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
             <input
