@@ -1,0 +1,183 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-gold: var(--gold);
+  --color-danger: var(--danger);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --font-mono: "Share Tech Mono", "Courier New", ui-monospace, monospace;
+  --font-sans: "Share Tech Mono", "Courier New", ui-monospace, monospace;
+}
+
+:root {
+  --radius: 0.25rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.22 0.02 25);
+  --surface: oklch(0.985 0.005 25);
+  --surface-2: oklch(0.95 0.02 25);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.22 0.02 25);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.22 0.02 25);
+  --primary: oklch(0.55 0.23 27);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.96 0.015 25);
+  --secondary-foreground: oklch(0.28 0.03 25);
+  --muted: oklch(0.96 0.01 25);
+  --muted-foreground: oklch(0.5 0.03 25);
+  --accent: oklch(0.95 0.04 25);
+  --accent-foreground: oklch(0.5 0.23 27);
+  --gold: oklch(0.62 0.19 35);
+  --danger: oklch(0.55 0.23 27);
+  --destructive: oklch(0.55 0.23 27);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.55 0.23 27 / 22%);
+  --input: oklch(0.55 0.23 27 / 25%);
+  --ring: oklch(0.55 0.23 27 / 55%);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-mono);
+    background-image:
+      linear-gradient(oklch(0.55 0.23 27 / 5%) 1px, transparent 1px),
+      linear-gradient(90deg, oklch(0.55 0.23 27 / 5%) 1px, transparent 1px);
+    background-size: 42px 42px;
+    letter-spacing: 0.02em;
+  }
+
+  ::selection {
+    background: var(--color-primary);
+    color: var(--color-primary-foreground);
+  }
+}
+
+@utility hex-grid {
+  background-image: radial-gradient(oklch(0.55 0.23 27 / 12%) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+@utility glow-border {
+  border: 1px solid var(--color-border);
+  box-shadow:
+    0 0 0 1px oklch(0.55 0.23 27 / 8%),
+    0 10px 24px -18px oklch(0.55 0.23 27 / 70%);
+}
+
+@utility glow-text {
+  text-shadow: none;
+}
+
+@utility glow-gold {
+  color: var(--color-gold);
+  text-shadow: none;
+}
+
+@utility panel {
+  background: linear-gradient(160deg, var(--color-surface), oklch(1 0 0));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 30px -24px oklch(0.55 0.23 27 / 80%);
+}
+
+@utility scanlines {
+  position: relative;
+}
+@utility scanline-overlay {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: repeating-linear-gradient(
+    to bottom,
+    oklch(1 0 0 / 0%) 0px,
+    oklch(1 0 0 / 0%) 2px,
+    oklch(0.55 0.23 27 / 4%) 3px,
+    oklch(0.55 0.23 27 / 4%) 4px
+  );
+}
+
+@utility glitch {
+  position: relative;
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 oklch(0.55 0.23 27 / 35%);
+  }
+  50% {
+    box-shadow: 0 0 0 6px oklch(0.55 0.23 27 / 0%);
+  }
+}
+
+@utility pulse-glow {
+  animation: pulse-glow 2.4s ease-in-out infinite;
+}
+
+@keyframes dot-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.5);
+    opacity: 0.5;
+  }
+}
+
+@utility status-dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: var(--color-primary);
+  animation: dot-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes rain {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
+@utility matrix-rain {
+  animation: rain linear infinite;
+}
