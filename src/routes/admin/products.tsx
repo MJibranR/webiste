@@ -32,6 +32,7 @@ const empty = (): Product => ({
   badge: "NEW",
   inStock: true,
   downloadLink: "",
+  imageUrl: "",
 });
 
 const field = "w-full rounded border border-border bg-background/60 px-3 py-2 text-xs text-foreground outline-none focus:border-primary";
