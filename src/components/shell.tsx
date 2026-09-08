@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useSettings } from "@/lib/use-settings";
 import { NotificationBell } from "./notification-bell";
@@ -33,14 +33,23 @@ export function MatrixRain() {
 }
 
 export function Logo({ size = "text-xl" }: { size?: string }) {
-  const { settings } = useSettings();
+  const { settings, loading } = useSettings();
   const [logoError, setLogoError] = useState(false);
   
-  const brandName = settings?.brandName || "SPIDER HEX";
-  const logoImageUrl = settings?.logoImageUrl || "";
-  const logoEmoji = settings?.logoEmoji || "🕷️";
+  // If settings are still loading, show fallback
+  if (loading || !settings) {
+    return (
+      <Link to="/" className={`${size} flex items-center gap-2 font-bold tracking-[0.25em] text-primary`}>
+        <span className="text-2xl">🕷️</span>
+        <span className="sr-only sm:not-sr-only">SPIDER HEX</span>
+      </Link>
+    );
+  }
   
-  // Use the logo from settings or fallback to emoji
+  const brandName = settings.brandName || "SPIDER HEX";
+  const logoImageUrl = settings.logoImageUrl || "";
+  const logoEmoji = settings.logoEmoji || "🕷️";
+  
   const logoSrc = logoImageUrl || "/favicon.png";
   
   return (
@@ -110,11 +119,20 @@ export function TopNav() {
 }
 
 export function Footer() {
-  const { settings } = useSettings();
+  const { settings, loading } = useSettings();
   
-  const footerText = settings?.footerText || "SPIDER HEX // PREMIUM GAMING PANELS";
-  const footerStatus = settings?.footerStatus || "ALL SYSTEMS OPERATIONAL";
-  const logoEmoji = settings?.logoEmoji || "🕷️";
+  if (loading || !settings) {
+    return (
+      <footer className="mt-16 border-t border-border py-8 text-center text-xs text-muted-foreground">
+        <p>🕷️ SPIDER HEX // PREMIUM GAMING PANELS</p>
+        <p className="mt-2 opacity-60">ALL SYSTEMS OPERATIONAL</p>
+      </footer>
+    );
+  }
+  
+  const footerText = settings.footerText || "SPIDER HEX // PREMIUM GAMING PANELS";
+  const footerStatus = settings.footerStatus || "ALL SYSTEMS OPERATIONAL";
+  const logoEmoji = settings.logoEmoji || "🕷️";
   
   return (
     <footer className="mt-16 border-t border-border py-8 text-center text-xs text-muted-foreground">
@@ -131,6 +149,25 @@ export function Footer() {
 }
 
 export function Page({ children }: { children: ReactNode }) {
+  const { loading } = useSettings();
+  
+  // Show loading state while settings load
+  if (loading) {
+    return (
+      <div className="min-h-screen">
+        <Scanlines />
+        <MatrixRain />
+        <TopNav />
+        <main className="mx-auto max-w-6xl px-4 py-8">
+          <div className="flex justify-center items-center min-h-[60vh]">
+            <p className="text-sm text-muted-foreground">LOADING...</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+  
   return (
     <div className="min-h-screen">
       <Scanlines />

@@ -59,36 +59,49 @@ function HeroSlideshow({ images }: { images: string[] }) {
 }
 
 function Landing() {
-  const s = useSettings();
+  const { settings, loading } = useSettings();
+
+  // Show loading state while settings load
+  if (loading || !settings) {
+    return (
+      <Page>
+        <div className="flex justify-center items-center min-h-[60vh]">
+          <p className="text-sm text-muted-foreground">LOADING...</p>
+        </div>
+      </Page>
+    );
+  }
+
+  const s = settings;
 
   return (
     <Page>
       <section className="hex-grid panel relative overflow-hidden px-6 py-16 text-center">
-        <HeroSlideshow images={s.heroImages.filter(Boolean)} />
+        <HeroSlideshow images={s.heroImages?.filter(Boolean) || []} />
         <div className="relative">
-        <p className="text-xs tracking-[0.4em] text-muted-foreground">
-          {s.heroBadge} <span className="status-dot align-middle" />
-        </p>
-        <h1 className="glitch glow-text mt-4 text-4xl font-bold tracking-[0.2em] text-primary sm:text-6xl md:text-7xl">
-          {s.heroTitle}
-        </h1>
-        <p className="mx-auto mt-5 max-w-xl text-sm text-muted-foreground">{s.heroSubtitle}</p>
-        <div className="mt-8 flex flex-wrap justify-center gap-3 text-xs">
-          <Link
-            to="/store"
-            className="pulse-glow rounded bg-primary px-6 py-3 font-bold text-primary-foreground transition hover:opacity-90"
-          >
-            {s.heroPrimaryCta}
-          </Link>
-          <Link to="/signup" className="rounded border border-border px-6 py-3 text-primary transition hover:bg-accent">
-            {s.heroSecondaryCta}
-          </Link>
-        </div>
+          <p className="text-xs tracking-[0.4em] text-muted-foreground">
+            {s.heroBadge} <span className="status-dot align-middle" />
+          </p>
+          <h1 className="glitch glow-text mt-4 text-4xl font-bold tracking-[0.2em] text-primary sm:text-6xl md:text-7xl">
+            {s.heroTitle}
+          </h1>
+          <p className="mx-auto mt-5 max-w-xl text-sm text-muted-foreground">{s.heroSubtitle}</p>
+          <div className="mt-8 flex flex-wrap justify-center gap-3 text-xs">
+            <Link
+              to="/store"
+              className="pulse-glow rounded bg-primary px-6 py-3 font-bold text-primary-foreground transition hover:opacity-90"
+            >
+              {s.heroPrimaryCta}
+            </Link>
+            <Link to="/signup" className="rounded border border-border px-6 py-3 text-primary transition hover:bg-accent">
+              {s.heroSecondaryCta}
+            </Link>
+          </div>
         </div>
       </section>
 
       <section className="mt-8 grid gap-4 sm:grid-cols-3">
-        {s.stats.map((st) => (
+        {s.stats?.map((st) => (
           <div key={st.label} className="panel p-6 text-center">
             <p className="glow-gold text-3xl font-bold">{st.value}</p>
             <p className="mt-2 text-[11px] tracking-[0.25em] text-muted-foreground">{st.label}</p>
@@ -99,7 +112,7 @@ function Landing() {
       <section className="mt-10">
         <SectionTitle>{s.featuresHeading}</SectionTitle>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {s.features.map((f, i) => {
+          {s.features?.map((f, i) => {
             const Icon = ICONS[i % ICONS.length]!;
             return (
               <div key={f.title} className="panel group p-6 transition hover:-translate-y-1 hover:border-primary">
@@ -117,13 +130,13 @@ function Landing() {
           <Youtube className="mr-2 inline h-5 w-5 text-danger" />
           {s.videosHeading}
         </SectionTitle>
-        {s.videos.length === 0 ? (
+        {s.videos?.length === 0 ? (
           <p className="panel p-8 text-center text-xs text-muted-foreground">
             NO VIDEOS YET — ADD YOUTUBE LINKS IN ADMIN → SITE CONTENT → LATEST VIDEOS
           </p>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {s.videos.map((v) => (
+            {s.videos?.map((v) => (
               <div key={v.id} className="panel overflow-hidden">
                 <div className="aspect-video w-full bg-black">
                   <iframe
