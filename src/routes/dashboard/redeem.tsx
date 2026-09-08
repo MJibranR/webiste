@@ -1,12 +1,11 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
-import { Copy, Gift } from "lucide-react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { SectionTitle } from "@/components/shell";
 import { useAuth } from "@/lib/auth";
-import { logActivity } from "@/lib/spiderhex";
-import { claimCode, listMyCodes, type RedeemCode } from "@/lib/redeem";
+import { redeemCodeAction } from "@/lib/redeem";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/dashboard/redeem")({
   component: () => (
@@ -16,134 +15,147 @@ export const Route = createFileRoute("/dashboard/redeem")({
   ),
   head: () => ({
     meta: [
-      { title: "Redeem Code — SPIDER HEX" },
-      { name: "description", content: "Enter your SPIDER HEX redeem code to unlock your panel download and access key." },
-      { property: "og:title", content: "Redeem Code — SPIDER HEX" },
-      { property: "og:description", content: "Unlock your panel download link and key with a redeem code." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
+      { title: "Redeem — SPIDER HEX" },
+      { name: "description", content: "Redeem your SPIDER HEX panel codes." },
     ],
   }),
 });
 
 function RedeemPage() {
   const { user } = useAuth();
-  const [value, setValue] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [mine, setMine] = useState<RedeemCode[]>([]);
+  const [code, setCode] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [redeemed, setRedeemed] = useState<any[]>([]);
 
-  const load = useCallback(() => {
-    void listMyCodes().then(setMine);
-  }, []);
-  useEffect(load, [load]);
+  useEffect(() => {
+    if (user) {
+      loadRedeemed();
+    }
+  }, [user]);
 
-  const submit = async () => {
-    if (!value.trim()) {
-      toast.error("ENTER A CODE FIRST");
-      return;
-    }
-    setBusy(true);
-    const { row, error } = await claimCode(value.trim());
-    setBusy(false);
-    if (error || !row) {
-      toast.error(error ?? "COULD NOT REDEEM THIS CODE");
-      return;
-    }
-    toast.success(`UNLOCKED — ${row.product_name.toUpperCase()}`);
-    logActivity("download", user?.email ?? "member", `Redeemed code ${row.code} (${row.product_name})`);
-    setValue("");
-    load();
+  const loadRedeemed = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('redeem_codes')
+      .select('*')
+      .eq('claimed_by', user.id);
+    setRedeemed(data || []);
   };
 
-  const copy = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast.success("COPIED");
-    } catch {
-      toast.error("COPY BLOCKED BY BROWSER");
+  const handleRedeem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) {
+      toast.error("PLEASE LOGIN FIRST");
+      return;
     }
+    if (!code.trim()) {
+      toast.error("ENTER A REDEEM CODE");
+      return;
+    }
+
+    setLoading(true);
+    const result = await redeemCodeAction(code.trim().toUpperCase(), user.id);
+    setLoading(false);
+
+    if (result.success) {
+      toast.success(result.message);
+      setCode("");
+      loadRedeemed();
+    } else {
+      toast.error(result.message);
+    }
+  };
+
+  const getFiles = (c: any) => {
+    if (c.files) {
+      try {
+        return JSON.parse(c.files);
+      } catch {
+        return [];
+      }
+    }
+    return c.download_link ? [{ id: 'legacy', label: 'DOWNLOAD', tag: 'MAIN', url: c.download_link }] : [];
   };
 
   return (
     <>
-      <SectionTitle sub="// UNLOCK A PANEL WITH YOUR CODE">REDEEM</SectionTitle>
+      <SectionTitle sub="// REDEEM YOUR PANEL ACCESS">REDEEM CODE</SectionTitle>
 
       <div className="panel p-6">
-        <p className="text-[11px] tracking-[0.2em] text-muted-foreground">
-          <Gift className="mr-2 inline h-4 w-4 text-primary" />
-          ENTER REDEEM CODE
-        </p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <input
-            className="min-w-[220px] flex-1 rounded border border-border bg-background/60 px-3 py-2.5 text-sm tracking-[0.2em] text-foreground outline-none focus:border-primary"
-            placeholder="SPX-XXXX-XXXX"
-            aria-label="Redeem code"
-            value={value}
-            onChange={(e) => setValue(e.target.value.toUpperCase())}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") void submit();
-            }}
-          />
-          <button
-            onClick={() => void submit()}
-            disabled={busy}
-            className="rounded bg-primary px-5 py-2.5 text-[11px] font-bold text-primary-foreground hover:opacity-90 disabled:opacity-60"
-          >
-            {busy ? "CHECKING…" : "REDEEM"}
-          </button>
-        </div>
+        <form onSubmit={handleRedeem} className="space-y-4">
+          <div>
+            <label className="block text-[11px] tracking-[0.2em] text-muted-foreground">
+              ENTER YOUR REDEEM CODE
+            </label>
+            <div className="mt-2 flex gap-3">
+              <input
+                type="text"
+                value={code}
+                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                placeholder="SPX-XXXX-XXXX"
+                className="flex-1 rounded border border-border bg-background/60 px-4 py-3 text-sm text-primary outline-none focus:border-primary font-mono"
+              />
+              <button
+                type="submit"
+                disabled={loading}
+                className="pulse-glow rounded bg-primary px-6 py-3 text-sm font-bold text-primary-foreground hover:opacity-90 disabled:opacity-60"
+              >
+                {loading ? "REDEEMING..." : "REDEEM"}
+              </button>
+            </div>
+          </div>
+        </form>
       </div>
 
-      <div className="mt-6">
-        <SectionTitle sub="// PANELS YOU UNLOCKED WITH CODES">CLAIMED CODES</SectionTitle>
-        {mine.length === 0 ? (
-          <div className="panel p-8 text-center text-xs text-muted-foreground">NO CODES REDEEMED YET</div>
-        ) : (
+      {redeemed.length > 0 && (
+        <div className="mt-6">
+          <h3 className="text-[11px] tracking-[0.2em] text-muted-foreground mb-3">
+            REDEEMED ITEMS ({redeemed.length})
+          </h3>
           <div className="space-y-3">
-            {mine.map((c) => (
-              <div key={c.id} className="panel p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm text-primary">{c.product_name}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      CODE {c.code}
-                      {c.claimed_at ? ` • ${new Date(c.claimed_at).toLocaleDateString()}` : ""}
-                    </p>
-                  </div>
-                  {c.download_link ? (
-                    <a
-                      href={c.download_link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="rounded bg-primary px-3 py-2 text-[11px] font-bold text-primary-foreground hover:opacity-90"
-                    >
-                      DOWNLOAD TOOL
-                    </a>
-                  ) : (
-                    <span className="text-[10px] text-muted-foreground">LINK PENDING</span>
-                  )}
-                </div>
-                {c.access_key ? (
-                  <div className="mt-3 flex items-center justify-between gap-3 rounded border border-border bg-accent/40 p-3">
-                    <div className="min-w-0">
-                      <p className="text-[10px] tracking-[0.2em] text-muted-foreground">ACCESS KEY</p>
-                      <p className="truncate text-xs text-primary">{c.access_key}</p>
+            {redeemed.map((item) => {
+              const files = getFiles(item);
+              return (
+                <div key={item.id} className="panel p-4 border border-primary/20">
+                  <div className="flex flex-wrap justify-between items-start gap-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <span className="text-lg">🎁</span>
+                        <p className="text-sm font-bold text-primary">{item.product_name}</p>
+                        {item.usage_limit > 1 && (
+                          <span className="text-[10px] text-gold">× {item.usage_count}/{item.usage_limit === -1 ? '∞' : item.usage_limit}</span>
+                        )}
+                      </div>
+                      {item.access_key && (
+                        <div className="mt-2 bg-accent/40 rounded p-2 border border-border/60">
+                          <p className="text-[10px] text-muted-foreground">ACCESS KEY</p>
+                          <p className="text-xs text-gold font-mono break-all">{item.access_key}</p>
+                        </div>
+                      )}
+                      {files.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                          <p className="text-[10px] text-muted-foreground">DOWNLOAD LINKS</p>
+                          {files.map((f: any) => (
+                            <a
+                              key={f.id}
+                              href={f.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-block text-xs text-primary hover:underline mr-3"
+                            >
+                              📥 {f.label || f.tag || 'Download'}
+                            </a>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <button
-                      onClick={() => void copy(c.access_key)}
-                      className="rounded border border-border p-2 text-muted-foreground hover:border-primary hover:text-primary"
-                      aria-label="Copy access key"
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                    </button>
                   </div>
-                ) : null}
-                {c.note ? <p className="mt-2 text-[11px] text-muted-foreground">{c.note}</p> : null}
-              </div>
-            ))}
+                </div>
+              );
+            })}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </>
   );
 }
