@@ -51,7 +51,6 @@ export interface Purchase {
 }
 
 /** Redeem Code Interface */
-/** Redeem Code Interface - Make all optional fields explicitly optional with undefined */
 export interface RedeemCode {
   id: string;
   code: string;
@@ -63,7 +62,7 @@ export interface RedeemCode {
   used: boolean;
   usedBy?: string;
   usedAt?: string;
-  expiresAt?: string; // This is optional, so it can be undefined
+  expiresAt?: string;
 }
 
 /** All download rows for an order, falling back to the legacy single link. */
@@ -87,8 +86,11 @@ const K_PRODUCTS = "sh_products";
 const K_PURCHASES = "sh_purchases";
 const K_SESSION = "sh_session";
 const K_REDEEM_CODES = "sh_redeem_codes";
+const K_SETTINGS = "sh_settings";
+const K_NOTIFICATIONS = "sh_notifications";
+const K_ACTIVITY = "sh_activity";
 
-const isBrowser = () => typeof window !== "undefined";
+const isBrowser = () => typeof window !== "undefined" && typeof window.localStorage !== "undefined";
 
 function read<T>(key: string, fallback: T): T {
   if (!isBrowser()) return fallback;
@@ -152,8 +154,22 @@ export const getUsers = () => read<User[]>(K_USERS, []);
 export const setUsers = (u: User[]) => write(K_USERS, u);
 export const getProducts = () => read<Product[]>(K_PRODUCTS, []);
 export const setProducts = (p: Product[]) => write(K_PRODUCTS, p);
-export const getPurchases = () => read<Purchase[]>(K_PURCHASES, []);
-export const setPurchases = (p: Purchase[]) => write(K_PURCHASES, p);
+
+export const getPurchases = (): Purchase[] => {
+  if (!isBrowser()) return [];
+  try {
+    return JSON.parse(localStorage.getItem(K_PURCHASES) || '[]');
+  } catch {
+    return [];
+  }
+};
+
+export const setPurchases = (purchases: Purchase[]) => {
+  if (!isBrowser()) return;
+  localStorage.setItem(K_PURCHASES, JSON.stringify(purchases));
+  window.dispatchEvent(new Event('sh:update'));
+};
+
 export const getSessionId = () => read<string | null>(K_SESSION, null);
 export const setSessionId = (id: string | null) => write(K_SESSION, id);
 
@@ -170,7 +186,6 @@ export function generateRedeemCode(
 ): RedeemCode {
   const code = `HEX-${Math.random().toString(36).slice(2, 8).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
   
-  // Create the object with all required fields
   const redeemCode: RedeemCode = {
     id: uid(),
     code,
@@ -182,7 +197,6 @@ export function generateRedeemCode(
     used: false,
   };
   
-  // Only add expiresAt if provided
   if (expiresIn) {
     redeemCode.expiresAt = new Date(Date.now() + expiresIn * 24 * 60 * 60 * 1000).toISOString();
   }
@@ -193,7 +207,7 @@ export function generateRedeemCode(
   return redeemCode;
 }
 
-export function redeemCode(code: string, userEmail: string): { 
+export function redeemCodeAction(code: string, userEmail: string): { 
   success: boolean; 
   message: string; 
   data?: { productName: string; downloadLink: string; credentials: string; files?: DownloadFile[] } 
@@ -207,17 +221,14 @@ export function redeemCode(code: string, userEmail: string): {
   
   const redeem = codes[index];
   
-  // Check if redeem exists
   if (!redeem) {
     return { success: false, message: 'CODE NOT FOUND' };
   }
   
-  // Check expiry
   if (redeem.expiresAt && new Date(redeem.expiresAt) < new Date()) {
     return { success: false, message: 'CODE HAS EXPIRED' };
   }
   
-  // Mark as used - create a new object with only defined properties
   const updatedCode: RedeemCode = {
     id: redeem.id,
     code: redeem.code,
@@ -231,7 +242,6 @@ export function redeemCode(code: string, userEmail: string): {
     usedAt: new Date().toISOString(),
   };
   
-  // Only add expiresAt if it exists
   if (redeem.expiresAt) {
     updatedCode.expiresAt = redeem.expiresAt;
   }
@@ -239,7 +249,6 @@ export function redeemCode(code: string, userEmail: string): {
   codes[index] = updatedCode;
   setRedeemCodes(codes);
   
-  // Create files from the single link
   const files: DownloadFile[] = [
     {
       id: uid(),
@@ -249,7 +258,6 @@ export function redeemCode(code: string, userEmail: string): {
     }
   ];
   
-  // Add to user's purchases
   const purchases = getPurchases();
   const newPurchase: Purchase = {
     id: uid(),
@@ -287,7 +295,7 @@ export function redeemCode(code: string, userEmail: string): {
   };
 }
 
-// ---------------- EDITABLE SITE CONTENT ----------------
+// ---------------- SITE SETTINGS ----------------
 
 export interface VideoItem {
   id: string;
@@ -323,8 +331,6 @@ export interface SiteSettings {
   topUpTemplate: string;
 }
 
-const K_SETTINGS = "sh_settings";
-
 export const DEFAULT_SETTINGS: SiteSettings = {
   brandName: "SPIDER HEX",
   logoEmoji: "🕷️",
@@ -358,17 +364,28 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   videos: [],
   storeHeading: "STORE",
   storeSub: "// SELECT YOUR WEAPON",
-  buyTemplate:
-    "Hello I'm {name} I want to buy {product} panel for pc/ios/android for lifetime for ${price} USD thank you!",
-  topUpTemplate:
-    "Hello I'm {name} ({email}) I want to top up my {brand} wallet with ${amount} USD thank you!",
+  buyTemplate: "Hello I'm {name} I want to buy {product} panel for pc/ios/android for lifetime for ${price} USD thank you!",
+  topUpTemplate: "Hello I'm {name} ({email}) I want to top up my {brand} wallet with ${amount} USD thank you!",
 };
 
-export const getSettings = (): SiteSettings => ({
-  ...DEFAULT_SETTINGS,
-  ...read<Partial<SiteSettings>>(K_SETTINGS, {}),
-});
-export const setSettings = (s: SiteSettings) => write(K_SETTINGS, s);
+export const getSettings = (): SiteSettings => {
+  if (!isBrowser()) return DEFAULT_SETTINGS;
+  try {
+    const stored = localStorage.getItem(K_SETTINGS);
+    if (stored) {
+      return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
+    }
+  } catch {
+    // ignore
+  }
+  return DEFAULT_SETTINGS;
+};
+
+export const setSettings = (s: SiteSettings) => {
+  if (!isBrowser()) return;
+  localStorage.setItem(K_SETTINGS, JSON.stringify(s));
+  window.dispatchEvent(new Event('sh:update'));
+};
 
 /** Turns a YouTube watch/share/embed URL or bare ID into an embeddable URL. */
 export function youtubeEmbed(url: string): string {
@@ -419,10 +436,20 @@ export interface AppNotification {
   readBy: string[];
 }
 
-const K_NOTIFICATIONS = "sh_notifications";
+export const getNotifications = (): AppNotification[] => {
+  if (!isBrowser()) return [];
+  try {
+    return JSON.parse(localStorage.getItem(K_NOTIFICATIONS) || '[]');
+  } catch {
+    return [];
+  }
+};
 
-export const getNotifications = () => read<AppNotification[]>(K_NOTIFICATIONS, []);
-export const setNotifications = (n: AppNotification[]) => write(K_NOTIFICATIONS, n);
+export const setNotifications = (notifications: AppNotification[]) => {
+  if (!isBrowser()) return;
+  localStorage.setItem(K_NOTIFICATIONS, JSON.stringify(notifications));
+  window.dispatchEvent(new Event('sh:update'));
+};
 
 export function pushNotification(userId: string, title: string, message: string) {
   const item: AppNotification = {
@@ -481,18 +508,35 @@ export interface ActivityLog {
   date: string;
 }
 
-const K_ACTIVITY = "sh_activity";
 const MAX_ACTIVITY = 300;
 
-export const getActivity = () =>
-  read<ActivityLog[]>(K_ACTIVITY, []).sort((a, b) => b.date.localeCompare(a.date));
+export const getActivity = (): ActivityLog[] => {
+  if (!isBrowser()) return [];
+  try {
+    return JSON.parse(localStorage.getItem(K_ACTIVITY) || '[]').sort((a: ActivityLog, b: ActivityLog) => 
+      b.date.localeCompare(a.date)
+    );
+  } catch {
+    return [];
+  }
+};
 
-export const setActivity = (a: ActivityLog[]) => write(K_ACTIVITY, a);
+export const setActivity = (logs: ActivityLog[]) => {
+  if (!isBrowser()) return;
+  localStorage.setItem(K_ACTIVITY, JSON.stringify(logs));
+  window.dispatchEvent(new Event('sh:update'));
+};
 
 export function logActivity(type: ActivityType, actor: string, message: string) {
-  const item: ActivityLog = { id: uid(), type, actor, message, date: new Date().toISOString() };
-  setActivity([item, ...read<ActivityLog[]>(K_ACTIVITY, [])].slice(0, MAX_ACTIVITY));
-  return item;
+  const logs = getActivity();
+  logs.push({
+    id: uid(),
+    type,
+    actor,
+    message,
+    date: new Date().toISOString(),
+  });
+  setActivity(logs.slice(0, MAX_ACTIVITY));
 }
 
 export const clearActivity = () => setActivity([]);
@@ -503,6 +547,7 @@ export function broadcastNotification(title: string, message: string, actor = "S
   logActivity("notification", actor, `Broadcast: ${title}`);
 }
 
+// ---------------- USER FUNCTIONS ----------------
 
 export async function getUserById(userId: string): Promise<{ email: string; fullName: string } | null> {
   try {
