@@ -92,6 +92,48 @@ export type Database = {
         }
         Relationships: []
       }
+      redeem_codes: {
+        Row: {
+          access_key: string
+          claimed_at: string | null
+          claimed_by: string | null
+          code: string
+          created_at: string
+          created_by: string | null
+          download_link: string
+          id: string
+          note: string
+          product_id: string | null
+          product_name: string
+        }
+        Insert: {
+          access_key?: string
+          claimed_at?: string | null
+          claimed_by?: string | null
+          code: string
+          created_at?: string
+          created_by?: string | null
+          download_link?: string
+          id?: string
+          note?: string
+          product_id?: string | null
+          product_name?: string
+        }
+        Update: {
+          access_key?: string
+          claimed_at?: string | null
+          claimed_by?: string | null
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          download_link?: string
+          id?: string
+          note?: string
+          product_id?: string | null
+          product_name?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
@@ -115,6 +157,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_set_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: undefined
+      }
       ensure_profile: {
         Args: { _full_name?: string; _username?: string; _whatsapp?: string }
         Returns: undefined
@@ -125,6 +174,28 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      redeem_code: {
+        Args: { _code: string }
+        Returns: {
+          access_key: string
+          claimed_at: string | null
+          claimed_by: string | null
+          code: string
+          created_at: string
+          created_by: string | null
+          download_link: string
+          id: string
+          note: string
+          product_id: string | null
+          product_name: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "redeem_codes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
     }
     Enums: {
