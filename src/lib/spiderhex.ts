@@ -140,6 +140,12 @@ export function ensureSeed() {
   if (!window.localStorage.getItem(K_PRODUCTS)) write(K_PRODUCTS, SEED_PRODUCTS);
 }
 
+export function notify() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('sh:update'));
+  }
+}
+
 export const getUsers = () => read<User[]>(K_USERS, []);
 export const setUsers = (u: User[]) => write(K_USERS, u);
 export const getProducts = () => read<Product[]>(K_PRODUCTS, []);
