@@ -1,10 +1,9 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import { useSettings } from "@/lib/use-settings";
-import logoAsset from "@/assets/spiderhex-logo.webp.asset.json";
 import { NotificationBell } from "./notification-bell";
-import { useState } from "react";
 
 export function Scanlines() {
   return <div className="scanline-overlay" aria-hidden />;
@@ -34,15 +33,19 @@ export function MatrixRain() {
 }
 
 export function Logo({ size = "text-xl" }: { size?: string }) {
-  const { brandName, logoImageUrl } = useSettings();
+  const { settings } = useSettings();
   const [logoError, setLogoError] = useState(false);
   
-  // Use the logo from public folder or fallback to emoji
+  const brandName = settings?.brandName || "SPIDER HEX";
+  const logoImageUrl = settings?.logoImageUrl || "";
+  const logoEmoji = settings?.logoEmoji || "🕷️";
+  
+  // Use the logo from settings or fallback to emoji
   const logoSrc = logoImageUrl || "/favicon.png";
   
   return (
     <Link to="/" className={`${size} flex items-center gap-2 font-bold tracking-[0.25em] text-primary`}>
-      {!logoError ? (
+      {!logoError && logoImageUrl ? (
         <img
           src={logoSrc}
           alt={`${brandName} logo`}
@@ -50,7 +53,7 @@ export function Logo({ size = "text-xl" }: { size?: string }) {
           onError={() => setLogoError(true)}
         />
       ) : (
-        <span className="text-2xl">🕷️</span>
+        <span className="text-2xl">{logoEmoji}</span>
       )}
       <span className="sr-only sm:not-sr-only">{brandName}</span>
     </Link>
@@ -107,7 +110,12 @@ export function TopNav() {
 }
 
 export function Footer() {
-  const { footerText, footerStatus, logoEmoji } = useSettings();
+  const { settings } = useSettings();
+  
+  const footerText = settings?.footerText || "SPIDER HEX // PREMIUM GAMING PANELS";
+  const footerStatus = settings?.footerStatus || "ALL SYSTEMS OPERATIONAL";
+  const logoEmoji = settings?.logoEmoji || "🕷️";
+  
   return (
     <footer className="mt-16 border-t border-border py-8 text-center text-xs text-muted-foreground">
       <p>

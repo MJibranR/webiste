@@ -1,22 +1,26 @@
-import { useCallback, useEffect, useState } from "react";
-import { DEFAULT_SETTINGS, getSettings, type SiteSettings } from "./spiderhex";
+import { useEffect, useState } from "react";
+import { getSettings, saveSettings, type SiteSettings } from "./settings";
 
-/** Live site content, kept in sync with admin edits. */
-export function useSettings(): SiteSettings {
-  const [settings, setState] = useState<SiteSettings>(DEFAULT_SETTINGS);
-
-  const sync = useCallback(() => setState(getSettings()), []);
+export function useSettings() {
+  const [settings, setSettings] = useState<SiteSettings | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    sync();
-    const handler = () => sync();
-    window.addEventListener("sh:update", handler);
-    window.addEventListener("storage", handler);
-    return () => {
-      window.removeEventListener("sh:update", handler);
-      window.removeEventListener("storage", handler);
-    };
-  }, [sync]);
+    async function load() {
+      const data = await getSettings();
+      setSettings(data);
+      setLoading(false);
+    }
+    load();
+  }, []);
 
-  return settings;
+  const updateSettings = async (newSettings: SiteSettings) => {
+    const success = await saveSettings(newSettings);
+    if (success) {
+      setSettings(newSettings);
+    }
+    return success;
+  };
+
+  return { settings, loading, updateSettings };
 }

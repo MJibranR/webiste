@@ -26,6 +26,7 @@ function RedeemPage() {
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [redeemed, setRedeemed] = useState<any[]>([]);
+  const [loadingRedeemed, setLoadingRedeemed] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -35,11 +36,25 @@ function RedeemPage() {
 
   const loadRedeemed = async () => {
     if (!user) return;
-    const { data } = await supabase
-      .from('redeem_codes')
-      .select('*')
-      .eq('claimed_by', user.id);
-    setRedeemed(data || []);
+    setLoadingRedeemed(true);
+    try {
+      // Get ALL codes this user has redeemed (claimed_by = user.id)
+      const { data, error } = await supabase
+        .from('redeem_codes')
+        .select('*')
+        .eq('claimed_by', user.id)
+        .order('claimed_at', { ascending: false });
+      
+      if (error) {
+        console.error('Error loading redeemed codes:', error);
+      } else {
+        setRedeemed(data || []);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    } finally {
+      setLoadingRedeemed(false);
+    }
   };
 
   const handleRedeem = async (e: React.FormEvent) => {
@@ -60,7 +75,7 @@ function RedeemPage() {
     if (result.success) {
       toast.success(result.message);
       setCode("");
-      loadRedeemed();
+      loadRedeemed(); // Refresh the list
     } else {
       toast.error(result.message);
     }
@@ -69,7 +84,8 @@ function RedeemPage() {
   const getFiles = (c: any) => {
     if (c.files) {
       try {
-        return JSON.parse(c.files);
+        const parsed = JSON.parse(c.files);
+        return Array.isArray(parsed) ? parsed : [];
       } catch {
         return [];
       }
@@ -104,13 +120,20 @@ function RedeemPage() {
               </button>
             </div>
           </div>
+          <p className="text-[10px] text-muted-foreground">
+            💡 Each code can only be used once. You can redeem multiple different codes.
+          </p>
         </form>
       </div>
 
-      {redeemed.length > 0 && (
+      {loadingRedeemed ? (
+        <div className="mt-6 panel p-8 text-center">
+          <p className="text-xs text-muted-foreground">LOADING YOUR REDEEMED CODES...</p>
+        </div>
+      ) : redeemed.length > 0 ? (
         <div className="mt-6">
           <h3 className="text-[11px] tracking-[0.2em] text-muted-foreground mb-3">
-            REDEEMED ITEMS ({redeemed.length})
+            YOUR REDEEMED CODES ({redeemed.length})
           </h3>
           <div className="space-y-3">
             {redeemed.map((item) => {
@@ -119,13 +142,17 @@ function RedeemPage() {
                 <div key={item.id} className="panel p-4 border border-primary/20">
                   <div className="flex flex-wrap justify-between items-start gap-3">
                     <div className="flex-1">
-                      <div className="flex items-center gap-3">
-                        <span className="text-lg">🎁</span>
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <span className="text-lg">✅</span>
                         <p className="text-sm font-bold text-primary">{item.product_name}</p>
+                        <span className="text-[10px] text-muted-foreground font-mono">({item.code})</span>
                         {item.usage_limit > 1 && (
                           <span className="text-[10px] text-gold">× {item.usage_count}/{item.usage_limit === -1 ? '∞' : item.usage_limit}</span>
                         )}
                       </div>
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        Redeemed: {item.claimed_at ? new Date(item.claimed_at).toLocaleString() : 'Unknown'}
+                      </p>
                       {item.access_key && (
                         <div className="mt-2 bg-accent/40 rounded p-2 border border-border/60">
                           <p className="text-[10px] text-muted-foreground">ACCESS KEY</p>
@@ -135,17 +162,19 @@ function RedeemPage() {
                       {files.length > 0 && (
                         <div className="mt-2 space-y-1">
                           <p className="text-[10px] text-muted-foreground">DOWNLOAD LINKS</p>
-                          {files.map((f: any) => (
-                            <a
-                              key={f.id}
-                              href={f.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-block text-xs text-primary hover:underline mr-3"
-                            >
-                              📥 {f.label || f.tag || 'Download'}
-                            </a>
-                          ))}
+                          <div className="flex flex-wrap gap-2">
+                            {files.map((f: any) => (
+                              <a
+                                key={f.id}
+                                href={f.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-block text-xs text-primary hover:underline bg-accent/20 px-3 py-1 rounded-full"
+                              >
+                                📥 {f.label || f.tag || 'Download'}
+                              </a>
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -154,6 +183,15 @@ function RedeemPage() {
               );
             })}
           </div>
+        </div>
+      ) : (
+        <div className="mt-6 panel p-8 text-center">
+          <p className="text-xs text-muted-foreground">
+            NO REDEEMED CODES YET —{" "}
+            <Link to="/store" className="text-primary hover:underline">
+              BROWSE THE STORE
+            </Link>
+          </p>
         </div>
       )}
     </>

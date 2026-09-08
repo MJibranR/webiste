@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminShell } from "@/components/admin-shell";
+import { useSettings } from "@/lib/use-settings";
 import { SectionTitle } from "@/components/shell";
 import { DEFAULT_SETTINGS, getSettings, setSettings, uid, type SiteSettings } from "@/lib/spiderhex";
 
@@ -58,10 +59,20 @@ function ContentAdmin() {
   const set = <K extends keyof SiteSettings>(key: K, value: SiteSettings[K]) =>
     setS((prev) => ({ ...prev, [key]: value }));
 
-  const save = () => {
-    setSettings(s);
-    toast.success("SITE CONTENT SAVED");
-  };
+
+
+// In the component:
+const { settings, updateSettings } = useSettings();
+
+const save = async () => {
+  if (!settings) return;
+  const success = await updateSettings(s);
+  if (success) {
+    toast.success("SITE CONTENT SAVED TO DATABASE");
+  } else {
+    toast.error("FAILED TO SAVE");
+  }
+};
 
   const reset = () => {
     if (!window.confirm("Reset all texts back to the defaults?")) return;
