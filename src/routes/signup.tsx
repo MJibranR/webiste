@@ -48,11 +48,6 @@ function SignupPage() {
       setError(res.error ?? "SIGNUP FAILED");
       return;
     }
-    if (res.pending) {
-      toast.success("CHECK YOUR EMAIL TO CONFIRM YOUR ACCOUNT");
-      navigate({ to: "/login" });
-      return;
-    }
     toast.success("ACCOUNT CREATED");
     navigate({ to: "/dashboard" });
   };

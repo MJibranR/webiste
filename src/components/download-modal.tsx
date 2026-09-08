@@ -27,14 +27,14 @@ export function DownloadModal({
     <Modal
       open={!!purchase}
       onClose={onClose}
-      sub={`${purchase?.productName ?? ""} UPDATE`}
+      sub={`${purchase?.productName ?? ""} • ${purchase?.isRedeem ? 'REDEEMED' : 'PURCHASED'}`}
       title={purchase?.productName ?? ""}
       footer={
         <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-border bg-accent/40 p-3">
           <div>
-            <p className="text-[11px] font-bold text-primary">FOR ANY SUPPORT & HELP</p>
+            <p className="text-[11px] font-bold text-primary">💬 NEED HELP?</p>
             <p className="text-[10px] text-muted-foreground">
-              Join our official Discord for instant assistance, error fixes and updates.
+              Join our Discord for support, error fixes and updates.
             </p>
           </div>
           <a
@@ -43,18 +43,20 @@ export function DownloadModal({
             rel="noopener noreferrer"
             className="rounded bg-primary px-3 py-2 text-[10px] font-bold text-primary-foreground hover:opacity-90"
           >
-            JOIN DISCORD SERVER
+            JOIN DISCORD
           </a>
         </div>
       }
     >
       <p className="text-center text-[11px] text-muted-foreground">
-        Official and verified download links, tools and essential fixes.
+        {files.length > 0 ? 'Official and verified download links' : 'No links available yet'}
       </p>
 
       {files.length === 0 ? (
         <p className="mt-5 rounded border border-border p-6 text-center text-xs text-muted-foreground">
-          NO LINKS ADDED YET
+          {purchase?.status === 'pending' 
+            ? '⏳ Order pending admin approval. Check back later.' 
+            : 'NO LINKS ADDED YET'}
         </p>
       ) : (
         <div className="mt-5 max-h-[45vh] space-y-2 overflow-y-auto pr-1">
@@ -65,7 +67,7 @@ export function DownloadModal({
             >
               <div className="min-w-0">
                 <p className="flex flex-wrap items-center gap-2 text-xs font-bold text-foreground">
-                  {f.label}
+                  {f.label || 'Download'}
                   {f.tag ? (
                     <span className="rounded border border-primary/50 px-2 py-0.5 text-[9px] text-primary">
                       {f.tag}

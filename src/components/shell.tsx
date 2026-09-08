@@ -4,6 +4,7 @@ import { useAuth } from "@/lib/auth";
 import { useSettings } from "@/lib/use-settings";
 import logoAsset from "@/assets/spiderhex-logo.webp.asset.json";
 import { NotificationBell } from "./notification-bell";
+import { useState } from "react";
 
 export function Scanlines() {
   return <div className="scanline-overlay" aria-hidden />;
@@ -34,14 +35,23 @@ export function MatrixRain() {
 
 export function Logo({ size = "text-xl" }: { size?: string }) {
   const { brandName, logoImageUrl } = useSettings();
-  const src = logoImageUrl || logoAsset.url;
+  const [logoError, setLogoError] = useState(false);
+  
+  // Use the logo from public folder or fallback to emoji
+  const logoSrc = logoImageUrl || "/favicon.png";
+  
   return (
     <Link to="/" className={`${size} flex items-center gap-2 font-bold tracking-[0.25em] text-primary`}>
-      <img
-        src={src}
-        alt={`${brandName} logo`}
-        className="h-9 w-9 rounded-md object-cover ring-1 ring-border"
-      />
+      {!logoError ? (
+        <img
+          src={logoSrc}
+          alt={`${brandName} logo`}
+          className="h-9 w-9 rounded-md object-cover ring-1 ring-border"
+          onError={() => setLogoError(true)}
+        />
+      ) : (
+        <span className="text-2xl">🕷️</span>
+      )}
       <span className="sr-only sm:not-sr-only">{brandName}</span>
     </Link>
   );

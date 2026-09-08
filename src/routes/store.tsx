@@ -16,6 +16,7 @@ import {
   pushNotification,
   logActivity,
   type Product,
+  type Purchase,
 } from "@/lib/spiderhex";
 
 export const Route = createFileRoute("/store")({
@@ -42,25 +43,39 @@ function StorePage() {
 
   const list = cat === "ALL" ? products : products.filter((p) => p.category === cat);
 
-  const record = (product: Product) => {
+  const record = (product: Product): Purchase | null => {
     if (!user) return null;
-    const purchase = {
+    
+    // Create purchase with 'pending' status
+    const purchase: Purchase = {
       id: uid(),
       userId: user.id,
       productId: product.id,
       productName: product.name,
       price: product.price,
       purchaseDate: new Date().toISOString(),
-      status: "active" as const,
+      status: 'pending',
       downloadLink: product.downloadLink || "",
+      files: product.downloadLink ? [
+        {
+          id: uid(),
+          label: product.name,
+          tag: 'PENDING',
+          url: product.downloadLink,
+        }
+      ] : [],
+      isRedeem: false,
     };
+    
     setPurchases([...getPurchases(), purchase]);
+    
     pushNotification(
       user.id,
-      "ORDER RECEIVED",
-      `Your order for ${product.name} ($${product.price}) was logged. We'll send your download link shortly.`,
+      "ORDER PLACED 🛒",
+      `Your order for ${product.name} ($${product.price}) is pending admin approval.`,
     );
-    logActivity("purchase", user.email, `Ordered ${product.name} for $${product.price}`);
+    
+    logActivity("purchase", user.email, `Ordered ${product.name} for $${product.price} (PENDING)`);
     return purchase;
   };
 
@@ -70,14 +85,16 @@ function StorePage() {
       navigate({ to: "/login" });
       return;
     }
+    
     record(product);
     const msg = buyMessage(user.fullName, product.name, product.price);
+    
     if (channel === "whatsapp") {
       window.open(waLink(msg), "_blank", "noopener");
-      toast.success("ORDER LOGGED — CONTINUE ON WHATSAPP");
+      toast.success("✅ ORDER PLACED! Complete payment on WhatsApp to activate your download.");
     } else {
       void discordCopy(msg);
-      toast.success("ORDER LOGGED — MESSAGE COPIED FOR DISCORD");
+      toast.success("✅ ORDER PLACED! Message copied. Send to admin on Discord.");
     }
   };
 
@@ -141,6 +158,9 @@ function StorePage() {
                   DISCORD
                 </button>
               </div>
+              <p className="mt-2 text-[9px] text-muted-foreground text-center">
+                ⚠️ Payment required. Links appear after admin approval.
+              </p>
             </article>
           ))}
         </div>

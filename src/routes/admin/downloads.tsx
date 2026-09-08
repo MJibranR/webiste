@@ -26,24 +26,23 @@ export const Route = createFileRoute("/admin/downloads")({
     meta: [
       { title: "Download Links — SPIDER HEX Admin" },
       { name: "description", content: "Attach and update download links for every SPIDER HEX order." },
-      { property: "og:title", content: "Download Links — SPIDER HEX Admin" },
-      { property: "og:description", content: "Deliver panel builds to buyers by setting their download links." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
 });
 
-const field =
-  "w-full rounded border border-border bg-background/60 px-3 py-2 text-xs text-foreground outline-none focus:border-primary";
+const field = "w-full rounded border border-border bg-background/60 px-3 py-2 text-xs text-foreground outline-none focus:border-primary";
 
 function DownloadsAdmin() {
   const { purchases, users } = useLive();
-  const [filter, setFilter] = useState<"all" | "pending">("all");
+  const [filter, setFilter] = useState<"all" | "pending" | "active">("all");
   const [editing, setEditing] = useState<Purchase | null>(null);
   const [rows, setRows] = useState<DownloadFile[]>([]);
 
-  const list = filter === "pending" ? purchases.filter((p) => purchaseFiles(p).length === 0) : purchases;
+  const list = filter === "pending" 
+    ? purchases.filter((p) => p.status === "pending") 
+    : filter === "active"
+    ? purchases.filter((p) => p.status === "active")
+    : purchases;
 
   const openEditor = (p: Purchase) => {
     const existing = purchaseFiles(p);
@@ -61,27 +60,43 @@ function DownloadsAdmin() {
     const clean = rows
       .map((f) => ({ ...f, label: f.label.trim(), tag: f.tag.trim(), url: f.url.trim() }))
       .filter((f) => f.url);
+    
+    if (clean.length === 0) {
+      toast.error("ADD AT LEAST ONE LINK");
+      return;
+    }
+    
     const hadLinks = purchaseFiles(editing).length > 0;
+    const wasPending = editing.status === 'pending';
 
     setPurchases(
       purchases.map((p) =>
-        p.id === editing.id ? { ...p, files: clean, downloadLink: clean[0]?.url ?? "" } : p,
+        p.id === editing.id 
+          ? { 
+              ...p, 
+              files: clean, 
+              downloadLink: clean[0]?.url ?? "",
+              status: clean.length > 0 ? 'active' : p.status
+            } 
+          : p,
       ),
     );
 
     if (clean.length > 0) {
       pushNotification(
         editing.userId,
-        hadLinks ? "DOWNLOAD LINKS UPDATED" : "DOWNLOAD READY",
+        wasPending ? "✅ ORDER ACTIVATED" : "📥 DOWNLOAD LINKS UPDATED",
         `${clean.length} download link${clean.length > 1 ? "s are" : " is"} now available for ${editing.productName}.`,
       );
     }
+    
     logActivity(
       "download",
       "ADMIN",
-      `${hadLinks ? "Updated" : "Added"} ${clean.length} download link(s) for ${editing.productName}`,
+      `${wasPending ? "Activated" : "Updated"} ${clean.length} download link(s) for ${editing.productName}`
     );
-    toast.success("CHANGES SAVED");
+    
+    toast.success(wasPending ? "ORDER ACTIVATED ✅" : "CHANGES SAVED");
     setEditing(null);
   };
 
@@ -94,14 +109,15 @@ function DownloadsAdmin() {
       `Your license for ${p.productName} is now ${next.toUpperCase()}.`,
     );
     logActivity("download", "ADMIN", `Set ${p.productName} license to ${next}`);
+    toast.success(`STATUS CHANGED TO ${next.toUpperCase()}`);
   };
 
   return (
     <>
       <SectionTitle sub="// DELIVERY CONTROL">DOWNLOAD LINKS</SectionTitle>
 
-      <div className="flex gap-2 text-[11px]">
-        {(["all", "pending"] as const).map((f) => (
+      <div className="flex gap-2 text-[11px] flex-wrap">
+        {(["all", "pending", "active"] as const).map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
@@ -111,7 +127,7 @@ function DownloadsAdmin() {
                 : "border-border text-muted-foreground hover:text-primary"
             }`}
           >
-            {f === "all" ? "ALL ORDERS" : "PENDING LINKS"}
+            {f === "all" ? "ALL ORDERS" : f === "pending" ? "⏳ PENDING" : "✅ ACTIVE"}
           </button>
         ))}
       </div>
@@ -123,31 +139,46 @@ function DownloadsAdmin() {
           {list.map((p) => {
             const buyer = users.find((u) => u.id === p.userId);
             const count = purchaseFiles(p).length;
+            const isPending = p.status === 'pending';
             return (
-              <div key={p.id} className="panel flex flex-wrap items-center justify-between gap-3 p-4">
+              <div key={p.id} className={`panel flex flex-wrap items-center justify-between gap-3 p-4 ${isPending ? 'border-gold/50' : ''}`}>
                 <div>
-                  <p className="text-sm text-primary">{p.productName}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-primary">{p.productName}</p>
+                    {isPending && (
+                      <span className="rounded border border-gold/50 px-2 py-0.5 text-[9px] text-gold">⏳ PENDING</span>
+                    )}
+                    {p.isRedeem && (
+                      <span className="rounded border border-primary/50 px-2 py-0.5 text-[9px] text-primary">🎁 REDEEM</span>
+                    )}
+                  </div>
                   <p className="text-[11px] text-muted-foreground">
                     {buyer?.email ?? "UNKNOWN"} • ${p.price} • {new Date(p.purchaseDate).toLocaleString()}
                   </p>
                   <p className="mt-1 text-[10px] text-muted-foreground">
-                    {count === 0 ? "NO LINKS ADDED" : `${count} LINK${count > 1 ? "S" : ""} ADDED`}
+                    {count === 0 ? "⏳ NO LINKS ADDED" : `📥 ${count} LINK${count > 1 ? "S" : ""} ADDED`}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     onClick={() => toggleStatus(p)}
                     className={`rounded border px-2 py-1 text-[10px] ${
-                      p.status === "active" ? "border-primary/60 text-primary" : "border-danger/60 text-danger"
+                      p.status === "active" ? "border-primary/60 text-primary" : 
+                      p.status === "pending" ? "border-gold/60 text-gold" :
+                      "border-danger/60 text-danger"
                     }`}
                   >
                     {p.status.toUpperCase()}
                   </button>
                   <button
                     onClick={() => openEditor(p)}
-                    className="rounded bg-primary px-4 py-2 text-[11px] font-bold text-primary-foreground hover:opacity-90"
+                    className={`rounded px-4 py-2 text-[11px] font-bold transition ${
+                      isPending 
+                        ? "pulse-glow bg-gold text-black hover:opacity-90" 
+                        : "bg-primary text-primary-foreground hover:opacity-90"
+                    }`}
                   >
-                    {count === 0 ? "ADD LINKS" : "MANAGE LINKS"}
+                    {count === 0 ? (isPending ? "⚡ ACTIVATE" : "ADD LINKS") : "📝 MANAGE"}
                   </button>
                 </div>
               </div>
@@ -179,13 +210,13 @@ function DownloadsAdmin() {
         }
       >
         <p className="text-center text-[11px] text-muted-foreground">
-          Add every file the buyer needs. Empty links are ignored on save.
+          Add all the download links for this product. Empty links are ignored on save.
         </p>
         <div className="mt-4 max-h-[45vh] space-y-3 overflow-y-auto pr-1">
           {rows.map((f, i) => (
             <div key={f.id} className="rounded border border-border bg-background/60 p-3">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] tracking-[0.2em] text-muted-foreground">FILE {i + 1}</span>
+                <span className="text-[10px] tracking-[0.2em] text-muted-foreground">LINK {i + 1}</span>
                 <button
                   onClick={() => setRows(rows.filter((r) => r.id !== f.id))}
                   aria-label={`Remove file ${i + 1}`}
@@ -212,7 +243,7 @@ function DownloadsAdmin() {
               </div>
               <input
                 className={`${field} mt-2`}
-                placeholder="https://download-link"
+                placeholder="https://download-link.com/file"
                 aria-label={`Link for file ${i + 1}`}
                 value={f.url}
                 onChange={(e) => update(f.id, { url: e.target.value })}
@@ -224,7 +255,7 @@ function DownloadsAdmin() {
           onClick={() => setRows([...rows, blank()])}
           className="mt-3 flex items-center gap-2 rounded border border-primary/50 px-3 py-2 text-[11px] text-primary hover:bg-accent"
         >
-          <Plus className="h-4 w-4" /> ADD FIELD
+          <Plus className="h-4 w-4" /> ADD ANOTHER LINK
         </button>
       </Modal>
     </>

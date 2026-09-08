@@ -11,6 +11,7 @@ const STATUS_LINES = [
 export function BootLoader({ ready, onDone }: { ready: boolean; onDone: () => void }) {
   const [progress, setProgress] = useState(0);
   const [fading, setFading] = useState(false);
+  const [logoError, setLogoError] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -47,15 +48,29 @@ export function BootLoader({ ready, onDone }: { ready: boolean; onDone: () => vo
       aria-label="Loading SPIDER HEX"
     >
       {/* Radar ring logo */}
-      <div className="relative mb-6 flex h-40 w-40 items-center justify-center">
-        <div className="absolute inset-0 animate-spin rounded-full border border-primary/25 [animation-duration:6s]" />
-        <div className="absolute inset-2 animate-spin rounded-full border border-dashed border-primary/30 [animation-duration:10s] [animation-direction:reverse]" />
-        <div className="absolute inset-0 rounded-full border-t-2 border-primary/80 animate-spin [animation-duration:2.5s]" />
-        <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-xl border border-primary/60 bg-surface">
-          <img src={logoAsset.url} alt="SPIDER HEX logo" className="h-full w-full object-cover" />
-        </div>
-      </div>
+    <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-xl border border-primary/60 bg-surface">
+      <img 
+        src="/favicon.png" 
+        alt="SPIDER HEX logo" 
+        className="h-full w-full object-cover"
+        onError={(e) => {
+          // Fallback if image fails to load
+          (e.target as HTMLImageElement).style.display = 'none';
+          // Show emoji fallback
+          const parent = (e.target as HTMLImageElement).parentElement;
+          if (parent) {
+            const fallback = document.createElement('span');
+            fallback.className = 'text-5xl';
+            fallback.textContent = '🕷️';
+            parent.appendChild(fallback);
+          }
+        }}
+      />
+      <br />
+    </div>
+        
 
+      <br />
       {/* Badge */}
       <div className="mb-5 flex items-center gap-2 rounded-full border border-primary/50 bg-surface px-4 py-1.5 shadow-[0_0_20px_2px_hsl(var(--primary)/0.25)]">
         <span className="h-2 w-2 animate-pulse rounded-full bg-primary" />

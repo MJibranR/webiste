@@ -17,8 +17,6 @@ export const Route = createFileRoute("/dashboard/downloads")({
     meta: [
       { title: "Downloads — SPIDER HEX" },
       { name: "description", content: "Download the gaming panels linked to your SPIDER HEX licenses." },
-      { property: "og:title", content: "Downloads — SPIDER HEX" },
-      { property: "og:description", content: "All your purchased panel downloads in one place." },
     ],
   }),
 });
@@ -44,31 +42,47 @@ function Downloads() {
         <div className="space-y-3">
           {mine.map((p) => {
             const count = purchaseFiles(p).length;
+            const isPending = p.status === 'pending';
             return (
-              <div key={p.id} className="panel flex flex-wrap items-center justify-between gap-3 p-4">
+              <div key={p.id} className={`panel flex flex-wrap items-center justify-between gap-3 p-4 ${isPending ? 'border-gold/50' : ''}`}>
                 <div>
-                  <p className="text-sm text-primary">{p.productName}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-primary">{p.productName}</p>
+                    {isPending && (
+                      <span className="rounded border border-gold/50 px-2 py-0.5 text-[9px] text-gold">⏳ PENDING</span>
+                    )}
+                    {p.isRedeem && (
+                      <span className="rounded border border-primary/50 px-2 py-0.5 text-[9px] text-primary">🎁 REDEEMED</span>
+                    )}
+                  </div>
                   <p className="text-[11px] text-muted-foreground">
                     ${p.price} • {new Date(p.purchaseDate).toLocaleString()}
                   </p>
+                  {p.credentials && (
+                    <p className="text-[10px] text-gold font-mono mt-1">🔑 {p.credentials}</p>
+                  )}
                 </div>
                 <div className="flex items-center gap-3">
                   <span
                     className={`rounded border px-2 py-1 text-[10px] ${
-                      p.status === "active" ? "border-primary/60 text-primary" : "border-danger/60 text-danger"
+                      p.status === "active" ? "border-primary/60 text-primary" :
+                      p.status === "pending" ? "border-gold/60 text-gold" :
+                      "border-danger/60 text-danger"
                     }`}
                   >
                     {p.status.toUpperCase()}
                   </span>
-                  {count > 0 ? (
+                  {count > 0 && p.status === 'active' ? (
                     <button
                       onClick={() => setOpen(p)}
                       className="pulse-glow rounded bg-primary px-4 py-2 text-[11px] font-bold text-primary-foreground hover:opacity-90"
                     >
-                      DOWNLOAD TOOL
+                      📥 DOWNLOAD ({count})
                     </button>
+                  ) : p.status === 'pending' ? (
+                    <span className="text-[10px] text-gold">⏳ WAITING FOR ADMIN</span>
                   ) : (
-                    <span className="text-[10px] text-muted-foreground">AWAITING ADMIN LINK</span>
+                    <span className="text-[10px] text-muted-foreground">⏳ AWAITING ADMIN LINK</span>
                   )}
                 </div>
               </div>

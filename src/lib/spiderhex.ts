@@ -41,9 +41,27 @@ export interface Purchase {
   productName: string;
   price: number;
   purchaseDate: string;
-  status: "active" | "expired";
+  status: "active" | "expired" | "pending";
   downloadLink: string;
   files?: DownloadFile[];
+  isRedeem?: boolean;
+  credentials?: string;
+}
+
+/** Redeem Code Interface */
+/** Redeem Code Interface - Make all optional fields explicitly optional with undefined */
+export interface RedeemCode {
+  id: string;
+  code: string;
+  productName: string;
+  downloadLink: string;
+  credentials: string;
+  createdBy: string;
+  createdAt: string;
+  used: boolean;
+  usedBy?: string;
+  usedAt?: string;
+  expiresAt?: string; // This is optional, so it can be undefined
 }
 
 /** All download rows for an order, falling back to the legacy single link. */
@@ -52,7 +70,6 @@ export const purchaseFiles = (p: Purchase): DownloadFile[] => {
   if (p.downloadLink) return [{ id: "legacy", label: "MAIN DOWNLOAD", tag: "OFFICIAL", url: p.downloadLink }];
   return [];
 };
-
 
 export const CATEGORIES = [
   "ALL",
@@ -67,6 +84,7 @@ const K_USERS = "sh_users";
 const K_PRODUCTS = "sh_products";
 const K_PURCHASES = "sh_purchases";
 const K_SESSION = "sh_session";
+const K_REDEEM_CODES = "sh_redeem_codes";
 
 const isBrowser = () => typeof window !== "undefined";
 
@@ -131,8 +149,134 @@ export const setPurchases = (p: Purchase[]) => write(K_PURCHASES, p);
 export const getSessionId = () => read<string | null>(K_SESSION, null);
 export const setSessionId = (id: string | null) => write(K_SESSION, id);
 
-export function notify() {
-  if (isBrowser()) window.dispatchEvent(new Event("sh:update"));
+// -------- REDEEM CODE FUNCTIONS --------
+export const getRedeemCodes = (): RedeemCode[] => read<RedeemCode[]>(K_REDEEM_CODES, []);
+export const setRedeemCodes = (codes: RedeemCode[]) => write(K_REDEEM_CODES, codes);
+
+export function generateRedeemCode(
+  productName: string,
+  downloadLink: string,
+  credentials: string,
+  adminEmail: string,
+  expiresIn?: number
+): RedeemCode {
+  const code = `HEX-${Math.random().toString(36).slice(2, 8).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+  
+  // Create the object with all required fields
+  const redeemCode: RedeemCode = {
+    id: uid(),
+    code,
+    productName,
+    downloadLink,
+    credentials,
+    createdBy: adminEmail,
+    createdAt: new Date().toISOString(),
+    used: false,
+  };
+  
+  // Only add expiresAt if provided
+  if (expiresIn) {
+    redeemCode.expiresAt = new Date(Date.now() + expiresIn * 24 * 60 * 60 * 1000).toISOString();
+  }
+  
+  const codes = getRedeemCodes();
+  codes.push(redeemCode);
+  setRedeemCodes(codes);
+  return redeemCode;
+}
+
+export function redeemCode(code: string, userEmail: string): { 
+  success: boolean; 
+  message: string; 
+  data?: { productName: string; downloadLink: string; credentials: string; files?: DownloadFile[] } 
+} {
+  const codes = getRedeemCodes();
+  const index = codes.findIndex(c => c.code === code && !c.used);
+  
+  if (index === -1) {
+    return { success: false, message: 'INVALID OR ALREADY USED CODE' };
+  }
+  
+  const redeem = codes[index];
+  
+  // Check if redeem exists
+  if (!redeem) {
+    return { success: false, message: 'CODE NOT FOUND' };
+  }
+  
+  // Check expiry
+  if (redeem.expiresAt && new Date(redeem.expiresAt) < new Date()) {
+    return { success: false, message: 'CODE HAS EXPIRED' };
+  }
+  
+  // Mark as used - create a new object with only defined properties
+  const updatedCode: RedeemCode = {
+    id: redeem.id,
+    code: redeem.code,
+    productName: redeem.productName,
+    downloadLink: redeem.downloadLink,
+    credentials: redeem.credentials,
+    createdBy: redeem.createdBy,
+    createdAt: redeem.createdAt,
+    used: true,
+    usedBy: userEmail,
+    usedAt: new Date().toISOString(),
+  };
+  
+  // Only add expiresAt if it exists
+  if (redeem.expiresAt) {
+    updatedCode.expiresAt = redeem.expiresAt;
+  }
+  
+  codes[index] = updatedCode;
+  setRedeemCodes(codes);
+  
+  // Create files from the single link
+  const files: DownloadFile[] = [
+    {
+      id: uid(),
+      label: redeem.productName,
+      tag: 'REDEEMED',
+      url: redeem.downloadLink,
+    }
+  ];
+  
+  // Add to user's purchases
+  const purchases = getPurchases();
+  const newPurchase: Purchase = {
+    id: uid(),
+    userId: userEmail,
+    productId: `redeem-${Date.now()}`,
+    productName: redeem.productName,
+    price: 0,
+    purchaseDate: new Date().toISOString(),
+    status: 'active',
+    downloadLink: redeem.downloadLink,
+    credentials: redeem.credentials,
+    files: files,
+    isRedeem: true,
+  };
+  purchases.push(newPurchase);
+  setPurchases(purchases);
+  
+  pushNotification(
+    userEmail,
+    'REDEEM SUCCESSFUL 🎉',
+    `You successfully redeemed ${redeem.productName}. Check your downloads!`
+  );
+  
+  logActivity('purchase', userEmail, `Redeemed ${redeem.productName} via code ${code}`);
+  
+  return {
+    success: true,
+    message: 'REDEEM SUCCESSFUL',
+    data: {
+      productName: redeem.productName,
+      downloadLink: redeem.downloadLink,
+      credentials: redeem.credentials,
+      files: files,
+    }
+  };
 }
 
 // ---------------- EDITABLE SITE CONTENT ----------------
@@ -256,12 +400,10 @@ export const topUpMessage = (name: string, email: string, amount: number) => {
   return fill(s.topUpTemplate, { name, email, amount: String(amount), brand: s.brandName });
 };
 
-
 // ---------------- NOTIFICATIONS ----------------
 
 export interface AppNotification {
   id: string;
-  /** target user id, or "*" for everyone */
   userId: string;
   title: string;
   message: string;
