@@ -136,36 +136,52 @@ export async function redeemCodeAction(code: string, userId: string): Promise<{
   } 
 }> {
   try {
+    // First, get the code
     const { data: codes, error: fetchError } = await supabase
       .from('redeem_codes')
       .select('*')
       .eq('code', code.toUpperCase());
     
-    if (fetchError || !codes || codes.length === 0) {
+    if (fetchError) {
+      console.error('Fetch error:', fetchError);
+      return { success: false, message: 'DATABASE ERROR' };
+    }
+    
+    if (!codes || codes.length === 0) {
       return { success: false, message: 'INVALID CODE' };
     }
     
     const redeem = codes[0];
     
+    // ✅ Check if redeem exists (add null check)
+    if (!redeem) {
+      return { success: false, message: 'CODE NOT FOUND' };
+    }
+    
     // Safely access properties with defaults
     const currentUsage = redeem.usage_count ?? 0;
     const maxUsage = redeem.usage_limit ?? 1;
     
+    // Check if code is already fully used
     if (maxUsage === 1 && currentUsage >= 1) {
       return { success: false, message: 'THIS CODE HAS ALREADY BEEN USED' };
     }
     
+    // Check if code has reached its limit
     if (maxUsage !== -1 && currentUsage >= maxUsage) {
       return { success: false, message: 'CODE HAS REACHED MAXIMUM USES' };
     }
     
+    // Check if this specific user already used this specific code
     if (redeem.claimed_by === userId) {
       return { success: false, message: 'YOU ALREADY USED THIS CODE' };
     }
     
+    // Calculate new usage count
     const newCount = currentUsage + 1;
     const isFullyUsed = maxUsage !== -1 && newCount >= maxUsage;
     
+    // Update usage count
     const { error: updateError } = await supabase
       .from('redeem_codes')
       .update({
@@ -180,18 +196,20 @@ export async function redeemCodeAction(code: string, userId: string): Promise<{
       return { success: false, message: 'FAILED TO REDEEM CODE' };
     }
     
+    // Parse files
     let files: DownloadFile[] = [];
     if (redeem.files) {
       try {
-        files = JSON.parse(redeem.files);
-        if (!Array.isArray(files)) {
-          files = [];
+        const parsed = JSON.parse(redeem.files);
+        if (Array.isArray(parsed)) {
+          files = parsed;
         }
       } catch {
         files = [];
       }
     }
     
+    // If no files but download_link exists, create a file entry
     if (files.length === 0 && redeem.download_link) {
       files = [{ 
         id: 'legacy', 
