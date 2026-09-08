@@ -19,10 +19,12 @@ import { Route as AdminContentRouteImport } from './routes/admin/content'
 import { Route as AdminDownloadsRouteImport } from './routes/admin/downloads'
 import { Route as AdminNotificationsRouteImport } from './routes/admin/notifications'
 import { Route as AdminProductsRouteImport } from './routes/admin/products'
+import { Route as AdminRedeemRouteImport } from './routes/admin/redeem'
 import { Route as AdminUsersRouteImport } from './routes/admin/users'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
 import { Route as DashboardDownloadsRouteImport } from './routes/dashboard/downloads'
 import { Route as DashboardPurchasesRouteImport } from './routes/dashboard/purchases'
+import { Route as DashboardRedeemRouteImport } from './routes/dashboard/redeem'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -74,6 +76,11 @@ const AdminProductsRoute = AdminProductsRouteImport.update({
   path: '/admin/products',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRedeemRoute = AdminRedeemRouteImport.update({
+  id: '/admin/redeem',
+  path: '/admin/redeem',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminUsersRoute = AdminUsersRouteImport.update({
   id: '/admin/users',
   path: '/admin/users',
@@ -94,6 +101,11 @@ const DashboardPurchasesRoute = DashboardPurchasesRouteImport.update({
   path: '/dashboard/purchases',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardRedeemRoute = DashboardRedeemRouteImport.update({
+  id: '/dashboard/redeem',
+  path: '/dashboard/redeem',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -105,9 +117,11 @@ export interface FileRoutesByFullPath {
   '/admin/downloads': typeof AdminDownloadsRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/products': typeof AdminProductsRoute
+  '/admin/redeem': typeof AdminRedeemRoute
   '/admin/users': typeof AdminUsersRoute
   '/dashboard/downloads': typeof DashboardDownloadsRoute
   '/dashboard/purchases': typeof DashboardPurchasesRoute
+  '/dashboard/redeem': typeof DashboardRedeemRoute
   '/admin/': typeof AdminIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
 }
@@ -121,9 +135,11 @@ export interface FileRoutesByTo {
   '/admin/downloads': typeof AdminDownloadsRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/products': typeof AdminProductsRoute
+  '/admin/redeem': typeof AdminRedeemRoute
   '/admin/users': typeof AdminUsersRoute
   '/dashboard/downloads': typeof DashboardDownloadsRoute
   '/dashboard/purchases': typeof DashboardPurchasesRoute
+  '/dashboard/redeem': typeof DashboardRedeemRoute
   '/admin': typeof AdminIndexRoute
   '/dashboard': typeof DashboardIndexRoute
 }
@@ -138,9 +154,11 @@ export interface FileRoutesById {
   '/admin/downloads': typeof AdminDownloadsRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/products': typeof AdminProductsRoute
+  '/admin/redeem': typeof AdminRedeemRoute
   '/admin/users': typeof AdminUsersRoute
   '/dashboard/downloads': typeof DashboardDownloadsRoute
   '/dashboard/purchases': typeof DashboardPurchasesRoute
+  '/dashboard/redeem': typeof DashboardRedeemRoute
   '/admin/': typeof AdminIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
 }
@@ -156,9 +174,11 @@ export interface FileRouteTypes {
     | '/admin/downloads'
     | '/admin/notifications'
     | '/admin/products'
+    | '/admin/redeem'
     | '/admin/users'
     | '/dashboard/downloads'
     | '/dashboard/purchases'
+    | '/dashboard/redeem'
     | '/admin/'
     | '/dashboard/'
   fileRoutesByTo: FileRoutesByTo
@@ -172,9 +192,11 @@ export interface FileRouteTypes {
     | '/admin/downloads'
     | '/admin/notifications'
     | '/admin/products'
+    | '/admin/redeem'
     | '/admin/users'
     | '/dashboard/downloads'
     | '/dashboard/purchases'
+    | '/dashboard/redeem'
     | '/admin'
     | '/dashboard'
   id:
@@ -188,9 +210,11 @@ export interface FileRouteTypes {
     | '/admin/downloads'
     | '/admin/notifications'
     | '/admin/products'
+    | '/admin/redeem'
     | '/admin/users'
     | '/dashboard/downloads'
     | '/dashboard/purchases'
+    | '/dashboard/redeem'
     | '/admin/'
     | '/dashboard/'
   fileRoutesById: FileRoutesById
@@ -205,9 +229,11 @@ export interface RootRouteChildren {
   AdminDownloadsRoute: typeof AdminDownloadsRoute
   AdminNotificationsRoute: typeof AdminNotificationsRoute
   AdminProductsRoute: typeof AdminProductsRoute
+  AdminRedeemRoute: typeof AdminRedeemRoute
   AdminUsersRoute: typeof AdminUsersRoute
   DashboardDownloadsRoute: typeof DashboardDownloadsRoute
   DashboardPurchasesRoute: typeof DashboardPurchasesRoute
+  DashboardRedeemRoute: typeof DashboardRedeemRoute
   AdminIndexRoute: typeof AdminIndexRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
 }
@@ -284,6 +310,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminProductsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/redeem': {
+      id: '/admin/redeem'
+      path: '/admin/redeem'
+      fullPath: '/admin/redeem'
+      preLoaderRoute: typeof AdminRedeemRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/users': {
       id: '/admin/users'
       path: '/admin/users'
@@ -312,6 +345,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardPurchasesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dashboard/redeem': {
+      id: '/dashboard/redeem'
+      path: '/dashboard/redeem'
+      fullPath: '/dashboard/redeem'
+      preLoaderRoute: typeof DashboardRedeemRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -325,9 +365,11 @@ const rootRouteChildren: RootRouteChildren = {
   AdminDownloadsRoute: AdminDownloadsRoute,
   AdminNotificationsRoute: AdminNotificationsRoute,
   AdminProductsRoute: AdminProductsRoute,
+  AdminRedeemRoute: AdminRedeemRoute,
   AdminUsersRoute: AdminUsersRoute,
   DashboardDownloadsRoute: DashboardDownloadsRoute,
   DashboardPurchasesRoute: DashboardPurchasesRoute,
+  DashboardRedeemRoute: DashboardRedeemRoute,
   AdminIndexRoute: AdminIndexRoute,
   DashboardIndexRoute: DashboardIndexRoute,
 }

@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
-import { LayoutDashboard, Download, History, Store, MessageCircle, LogOut } from "lucide-react";
+import { LayoutDashboard, Download, History, Store, MessageCircle, LogOut, Gift } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Logo, MatrixRain, Scanlines, Footer } from "./shell";
 
@@ -23,6 +23,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   const nav = [
     { to: "/dashboard", label: "DASHBOARD", icon: LayoutDashboard },
     { to: "/dashboard/downloads", label: "DOWNLOADS", icon: Download },
+    { to: "/dashboard/redeem", label: "REDEEM", icon: Gift },
     { to: "/dashboard/purchases", label: "HISTORY", icon: History },
     { to: "/store", label: "STORE", icon: Store },
   ] as const;
