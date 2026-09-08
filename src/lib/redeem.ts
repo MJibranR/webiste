@@ -21,7 +21,7 @@ export interface RedeemCode {
   claimed_at: string | null;
   usage_limit: number;
   usage_count: number;
-  files: string | null; // JSON string in database
+  files: string | null;
 }
 
 export function generateCode(): string {
@@ -61,28 +61,43 @@ export async function createCode(data: {
   usageLimit: number;
   files: DownloadFile[];
 }): Promise<string | null> {
-  const filesJson = data.files.length > 0 ? JSON.stringify(data.files) : null;
-  
-  const { error } = await supabase
-    .from('redeem_codes')
-    .insert({
+  try {
+    // Ensure files is always an array
+    const filesArray = data.files || [];
+    const filesJson = filesArray.length > 0 ? JSON.stringify(filesArray) : null;
+    
+    const insertData: any = {
       code: data.code.toUpperCase(),
-      product_id: data.productId,
-      product_name: data.productName,
-      download_link: data.downloadLink,
-      access_key: data.accessKey,
-      note: data.note,
-      usage_limit: data.usageLimit,
+      product_name: data.productName || 'Unknown Panel',
+      download_link: data.downloadLink || '',
+      access_key: data.accessKey || '',
+      note: data.note || '',
+      usage_limit: data.usageLimit || 1,
       usage_count: 0,
       files: filesJson,
       created_at: new Date().toISOString(),
-    });
-  
-  if (error) {
-    console.error('Error creating redeem code:', error);
-    return error.message;
+    };
+
+    // Only add product_id if it's provided and not empty
+    if (data.productId && data.productId.trim() !== '') {
+      insertData.product_id = data.productId;
+    }
+
+    console.log('Inserting redeem code:', insertData);
+
+    const { error } = await supabase
+      .from('redeem_codes')
+      .insert(insertData);
+    
+    if (error) {
+      console.error('Supabase error creating redeem code:', error);
+      return error.message;
+    }
+    return null;
+  } catch (err: any) {
+    console.error('Error in createCode:', err);
+    return err.message || 'Unknown error';
   }
-  return null;
 }
 
 export async function deleteCode(id: string): Promise<string | null> {
@@ -108,78 +123,87 @@ export async function redeemCodeAction(code: string, userId: string): Promise<{
     files?: DownloadFile[];
   } 
 }> {
-  // First, get the code
-  const { data: codes, error: fetchError } = await supabase
-    .from('redeem_codes')
-    .select('*')
-    .eq('code', code.toUpperCase());
-  
-  if (fetchError || !codes || codes.length === 0) {
-    return { success: false, message: 'INVALID OR ALREADY USED CODE' };
-  }
-  
-  const redeem = codes[0];
-  
-  // Check if already claimed by this user
-  if (redeem.claimed_by === userId) {
-    return { success: false, message: 'YOU ALREADY CLAIMED THIS CODE' };
-  }
-  
-  // Check usage limit
-  const currentUsage = redeem.usage_count || 0;
-  const maxUsage = redeem.usage_limit || 1;
-  
-  if (maxUsage !== -1 && currentUsage >= maxUsage) {
-    return { success: false, message: 'CODE HAS REACHED MAXIMUM USES' };
-  }
-  
-  // Calculate new usage count
-  const newCount = currentUsage + 1;
-  const isFullyUsed = maxUsage !== -1 && newCount >= maxUsage;
-  
-  // Update usage count
-  const { error: updateError } = await supabase
-    .from('redeem_codes')
-    .update({
-      usage_count: newCount,
-      claimed_by: isFullyUsed ? userId : null,
-      claimed_at: isFullyUsed ? new Date().toISOString() : null,
-    })
-    .eq('id', redeem.id);
-  
-  if (updateError) {
-    console.error('Error updating redeem code:', updateError);
-    return { success: false, message: 'FAILED TO REDEEM CODE' };
-  }
-  
-  // Parse files
-  let files: DownloadFile[] = [];
-  if (redeem.files) {
-    try {
-      files = JSON.parse(redeem.files);
-    } catch {
-      files = [];
+  try {
+    // First, get the code
+    const { data: codes, error: fetchError } = await supabase
+      .from('redeem_codes')
+      .select('*')
+      .eq('code', code.toUpperCase());
+    
+    if (fetchError || !codes || codes.length === 0) {
+      return { success: false, message: 'INVALID OR ALREADY USED CODE' };
     }
-  }
-  
-  // If no files but download_link exists, create a file entry
-  if (files.length === 0 && redeem.download_link) {
-    files = [{ 
-      id: 'legacy', 
-      label: 'MAIN DOWNLOAD', 
-      tag: 'OFFICIAL', 
-      url: redeem.download_link 
-    }];
-  }
-  
-  return {
-    success: true,
-    message: isFullyUsed ? 'REDEEM SUCCESSFUL' : `REDEEMED (${newCount}/${maxUsage === -1 ? '∞' : maxUsage})`,
-    data: {
-      productName: redeem.product_name,
-      downloadLink: redeem.download_link || '',
-      accessKey: redeem.access_key || '',
-      files: files,
+    
+    const redeem = codes[0];
+    
+    // Check if already claimed by this user
+    if (redeem.claimed_by === userId) {
+      return { success: false, message: 'YOU ALREADY CLAIMED THIS CODE' };
     }
-  };
+    
+    // Check usage limit
+    const currentUsage = redeem.usage_count || 0;
+    const maxUsage = redeem.usage_limit || 1;
+    
+    if (maxUsage !== -1 && currentUsage >= maxUsage) {
+      return { success: false, message: 'CODE HAS REACHED MAXIMUM USES' };
+    }
+    
+    // Calculate new usage count
+    const newCount = currentUsage + 1;
+    const isFullyUsed = maxUsage !== -1 && newCount >= maxUsage;
+    
+    // Update usage count
+    const { error: updateError } = await supabase
+      .from('redeem_codes')
+      .update({
+        usage_count: newCount,
+        claimed_by: isFullyUsed ? userId : null,
+        claimed_at: isFullyUsed ? new Date().toISOString() : null,
+      })
+      .eq('id', redeem.id);
+    
+    if (updateError) {
+      console.error('Error updating redeem code:', updateError);
+      return { success: false, message: 'FAILED TO REDEEM CODE' };
+    }
+    
+    // Parse files
+    let files: DownloadFile[] = [];
+    if (redeem.files) {
+      try {
+        files = JSON.parse(redeem.files);
+        // Ensure files is an array
+        if (!Array.isArray(files)) {
+          files = [];
+        }
+      } catch {
+        files = [];
+      }
+    }
+    
+    // If no files but download_link exists, create a file entry
+    if (files.length === 0 && redeem.download_link) {
+      files = [{ 
+        id: 'legacy', 
+        label: 'MAIN DOWNLOAD', 
+        tag: 'OFFICIAL', 
+        url: redeem.download_link 
+      }];
+    }
+    
+    return {
+      success: true,
+      message: isFullyUsed ? 'REDEEM SUCCESSFUL' : `REDEEMED (${newCount}/${maxUsage === -1 ? '∞' : maxUsage})`,
+      data: {
+        productName: redeem.product_name,
+        downloadLink: redeem.download_link || '',
+        accessKey: redeem.access_key || '',
+        files: files,
+      }
+    };
+  } catch (err: any) {
+    console.error('Error in redeemCodeAction:', err);
+    return { success: false, message: err.message || 'REDEEM FAILED' };
+  }
 }

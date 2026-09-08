@@ -1,15 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { Copy, RefreshCw, Trash2, Plus } from "lucide-react";
+import { Copy, RefreshCw, Trash2, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { AdminShell } from "@/components/admin-shell";
 import { SectionTitle } from "@/components/shell";
 import { Modal } from "@/components/modal";
 import { useLive } from "@/lib/use-live";
 import { logActivity } from "@/lib/spiderhex";
-import { createCode, deleteCode, generateCode, listAllCodes, type RedeemCode } from "@/lib/redeem";
+import { createCode, deleteCode, generateCode, listAllCodes, type RedeemCode, type DownloadFile } from "@/lib/redeem";
 
-export const Route = createFileRoute("/admin/redeem-codes")({
+// ✅ FIX: Use the correct route name based on file location
+// Since file is at src/routes/admin/redeem-codes.tsx
+// The route should be "/admin/redeem-codes"
+export const Route = createFileRoute("/admin/redeem")({
   component: () => (
     <AdminShell>
       <RedeemAdmin />
@@ -19,10 +22,6 @@ export const Route = createFileRoute("/admin/redeem-codes")({
     meta: [
       { title: "Redeem Codes — SPIDER HEX Admin" },
       { name: "description", content: "Create redeem codes that unlock a panel download link and access key." },
-      { property: "og:title", content: "Redeem Codes — SPIDER HEX Admin" },
-      { property: "og:description", content: "Generate and manage one-time redeem codes for members." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
 });
@@ -40,6 +39,8 @@ function RedeemAdmin() {
   const [downloadLink, setDownloadLink] = useState("");
   const [accessKey, setAccessKey] = useState("");
   const [note, setNote] = useState("");
+  const [usageLimit, setUsageLimit] = useState(1);
+  const [files, setFiles] = useState<DownloadFile[]>([]);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(() => {
@@ -63,6 +64,20 @@ function RedeemAdmin() {
     setDownloadLink("");
     setAccessKey("");
     setNote("");
+    setUsageLimit(1);
+    setFiles([]);
+  };
+
+  const addFile = () => {
+    setFiles([...files, { id: Date.now().toString(), label: "", tag: "", url: "" }]);
+  };
+
+  const removeFile = (id: string) => {
+    setFiles(files.filter(f => f.id !== id));
+  };
+
+  const updateFile = (id: string, field: keyof DownloadFile, value: string) => {
+    setFiles(files.map(f => f.id === id ? { ...f, [field]: value } : f));
   };
 
   const submit = async () => {
@@ -70,12 +85,24 @@ function RedeemAdmin() {
       toast.error("CODE AND PANEL NAME ARE REQUIRED");
       return;
     }
-    if (!downloadLink.trim() && !accessKey.trim()) {
-      toast.error("ADD A DOWNLOAD LINK OR A KEY");
+    if (!downloadLink.trim() && files.length === 0) {
+      toast.error("ADD A DOWNLOAD LINK OR FILES");
       return;
     }
     setBusy(true);
-    const err = await createCode({ code, productId: productId || null, productName, downloadLink, accessKey, note });
+    
+    // ✅ FIX: Pass all required fields including usageLimit and files
+    const err = await createCode({ 
+      code, 
+      productId: productId || null, 
+      productName, 
+      downloadLink, 
+      accessKey, 
+      note,
+      usageLimit, // ✅ Added this
+      files: files || [] // ✅ Added this
+    });
+    
     setBusy(false);
     if (err) {
       toast.error(/duplicate|unique/i.test(err) ? "THAT CODE ALREADY EXISTS" : err.toUpperCase());
@@ -110,6 +137,11 @@ function RedeemAdmin() {
   };
 
   const owner = (id: string | null) => users.find((u) => u.id === id)?.email ?? "—";
+
+  const getUsageText = (c: RedeemCode) => {
+    if (c.usage_limit === -1) return `∞ used: ${c.usage_count}`;
+    return `${c.usage_count}/${c.usage_limit}`;
+  };
 
   return (
     <>
@@ -151,7 +183,7 @@ function RedeemAdmin() {
           </div>
         }
       >
-        <div className="space-y-4">
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className="block text-[10px] text-muted-foreground mb-1">CODE</label>
@@ -172,16 +204,29 @@ function RedeemAdmin() {
               </div>
             </div>
             <div>
-              <label className="block text-[10px] text-muted-foreground mb-1">PANEL</label>
-              <select className={input} value={productId} onChange={(e) => pickProduct(e.target.value)}>
-                <option value="">— CUSTOM / MANUAL —</option>
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
+              <label className="block text-[10px] text-muted-foreground mb-1">USAGE LIMIT</label>
+              <select className={input} value={usageLimit} onChange={(e) => setUsageLimit(Number(e.target.value))}>
+                <option value="1">1 User</option>
+                <option value="5">5 Users</option>
+                <option value="10">10 Users</option>
+                <option value="25">25 Users</option>
+                <option value="50">50 Users</option>
+                <option value="100">100 Users</option>
+                <option value="-1">Unlimited (∞)</option>
               </select>
             </div>
+          </div>
+
+          <div>
+            <label className="block text-[10px] text-muted-foreground mb-1">PANEL</label>
+            <select className={input} value={productId} onChange={(e) => pickProduct(e.target.value)}>
+              <option value="">— CUSTOM / MANUAL —</option>
+              {products.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>
@@ -205,7 +250,45 @@ function RedeemAdmin() {
           </div>
 
           <div>
-            <label className="block text-[10px] text-muted-foreground mb-1">DOWNLOAD LINK</label>
+            <label className="block text-[10px] text-muted-foreground mb-1">DOWNLOAD LINKS (FILES)</label>
+            {files.map((f) => (
+              <div key={f.id} className="flex gap-2 mb-2">
+                <input
+                  className={input}
+                  placeholder="Title"
+                  value={f.label}
+                  onChange={(e) => updateFile(f.id, 'label', e.target.value)}
+                />
+                <input
+                  className={input}
+                  placeholder="Tag (e.g. OFFICIAL)"
+                  value={f.tag}
+                  onChange={(e) => updateFile(f.id, 'tag', e.target.value)}
+                />
+                <input
+                  className={input}
+                  placeholder="https://..."
+                  value={f.url}
+                  onChange={(e) => updateFile(f.id, 'url', e.target.value)}
+                />
+                <button
+                  onClick={() => removeFile(f.id)}
+                  className="rounded border border-danger/50 px-2 text-danger hover:bg-danger/10"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+            <button
+              onClick={addFile}
+              className="text-[11px] text-primary hover:underline flex items-center gap-1"
+            >
+              <Plus className="h-3.5 w-3.5" /> ADD LINK
+            </button>
+          </div>
+
+          <div>
+            <label className="block text-[10px] text-muted-foreground mb-1">SINGLE DOWNLOAD LINK (FALLBACK)</label>
             <input
               className={input}
               placeholder="https://example.com/download.zip"
@@ -230,12 +313,12 @@ function RedeemAdmin() {
         {codes.length === 0 ? (
           <p className="p-8 text-center text-xs text-muted-foreground">NO CODES YET</p>
         ) : (
-          <table className="w-full min-w-[820px] text-left text-xs">
+          <table className="w-full min-w-[900px] text-left text-xs">
             <thead className="text-[10px] tracking-[0.15em] text-muted-foreground">
               <tr className="border-b border-border">
                 <th className="p-3">CODE</th>
                 <th className="p-3">PANEL</th>
-                <th className="p-3">KEY</th>
+                <th className="p-3">USAGE</th>
                 <th className="p-3">STATUS</th>
                 <th className="p-3 text-right">ACTIONS</th>
               </tr>
@@ -245,10 +328,12 @@ function RedeemAdmin() {
                 <tr key={c.id} className="border-b border-border/50">
                   <td className="p-3 font-bold text-primary">{c.code}</td>
                   <td className="p-3">{c.product_name}</td>
-                  <td className="p-3 text-muted-foreground">{c.access_key || "—"}</td>
+                  <td className="p-3 text-muted-foreground">{getUsageText(c)}</td>
                   <td className="p-3">
-                    {c.claimed_by ? (
-                      <span className="text-[10px] text-muted-foreground">CLAIMED • {owner(c.claimed_by)}</span>
+                    {c.claimed_by && c.usage_limit !== -1 && c.usage_count >= c.usage_limit ? (
+                      <span className="text-[10px] text-muted-foreground">USED UP</span>
+                    ) : c.usage_count > 0 ? (
+                      <span className="rounded border border-gold/60 px-2 py-1 text-[10px] text-gold">PARTIAL</span>
                     ) : (
                       <span className="rounded border border-primary/60 px-2 py-1 text-[10px] text-primary">UNUSED</span>
                     )}

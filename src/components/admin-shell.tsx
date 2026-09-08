@@ -20,16 +20,16 @@ export function AdminShell({ children }: { children: ReactNode }) {
     );
   }
 
-  const nav = [
-    { to: "/admin", label: "OVERVIEW" },
-    { to: "/admin/products", label: "PRODUCTS" },
-    { to: "/admin/downloads", label: "DOWNLOADS" },
-    { to: "/admin/redeem", label: "REDEEM CODES" },
-    { to: "/admin/users", label: "USERS" },
-    { to: "/admin/content", label: "SITE CONTENT" },
-    { to: "/admin/notifications", label: "NOTIFICATIONS" },
-    { to: "/admin/activity", label: "ACTIVITY" },
-  ] as const;
+const nav = [
+  { to: "/admin", label: "OVERVIEW" },
+  { to: "/admin/products", label: "PRODUCTS" },
+  { to: "/admin/downloads", label: "DOWNLOADS" },
+  { to: "/admin/redeem", label: "REDEEM CODES" },
+  { to: "/admin/users", label: "USERS" },
+  { to: "/admin/content", label: "SITE CONTENT" },
+  { to: "/admin/notifications", label: "NOTIFICATIONS" },
+  { to: "/admin/activity", label: "ACTIVITY" },
+] as const;
 
   return (
     <div className="min-h-screen">
