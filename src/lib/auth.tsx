@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { logActivity, type User } from "./spiderhex";
+import { logActivity, type User, uid, getUsers, setUsers } from "./spiderhex";
 
 interface AuthValue {
   user: User | null;
@@ -93,10 +93,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
     });
     if (error) {
-      const msg = /confirm/i.test(error.message)
-        ? "EMAIL NOT CONFIRMED — CHECK YOUR INBOX"
-        : "WRONG EMAIL OR PASSWORD";
-      return { ok: false, error: msg };
+      // 🔥 FIX: Remove confirmation check
+      return { ok: false, error: "WRONG EMAIL OR PASSWORD" };
     }
     const found = await loadCurrentUser();
     setUser(found);
@@ -106,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signup: AuthValue["signup"] = useCallback(async (data) => {
     const email = data.email.trim().toLowerCase();
+    
     const { data: res, error } = await supabase.auth.signUp({
       email,
       password: data.password,
@@ -118,14 +117,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
       },
     });
+    
     if (error) {
       const msg = /already/i.test(error.message)
         ? "EMAIL ALREADY REGISTERED"
         : error.message.toUpperCase();
       return { ok: false, error: msg };
     }
+    
+    // Also save to localStorage
+    const newUser: User = {
+      id: res.user?.id || uid(),
+      email,
+      fullName: data.fullName.trim(),
+      whatsapp: data.whatsapp.trim(),
+      role: 'user',
+      balance: 0,
+      totalSpent: 0,
+      level: 1,
+      xp: 0,
+      username: data.fullName.trim().toLowerCase().replace(/\s+/g, "_") || "hunter",
+      password: data.password,
+    };
+    
+    const users = getUsers();
+    if (!users.some(u => u.email === email)) {
+      users.push(newUser);
+      setUsers(users);
+    }
+    
     logActivity("signup", email, `${data.fullName.trim() || email} created an account`);
+    
     if (!res.session) return { ok: true, pending: true };
+    
     const found = await loadCurrentUser();
     setUser(found);
     return { ok: true };
