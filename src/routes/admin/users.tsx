@@ -1,12 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminShell } from "@/components/admin-shell";
 import { SectionTitle } from "@/components/shell";
 import { useAuth } from "@/lib/auth";
 import { useLive } from "@/lib/use-live";
-import { logActivity, pushNotification, setUsers, type Role } from "@/lib/spiderhex";
+import { logActivity, notify, pushNotification, type Role } from "@/lib/spiderhex";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/admin/users")({
   component: () => (
@@ -30,7 +30,7 @@ const QUICK = [1, 5, 10];
 
 function UsersAdmin() {
   const { user: me } = useAuth();
-  const { users, purchases } = useLive();
+  const { users, purchases, sync } = useLive();
   const [query, setQuery] = useState("");
   const [custom, setCustom] = useState<Record<string, string>>({});
 
@@ -39,12 +39,16 @@ function UsersAdmin() {
     (u) => !q || u.email.toLowerCase().includes(q) || u.fullName.toLowerCase().includes(q),
   );
 
-  const adjust = (id: string, delta: number) => {
+  const adjust = async (id: string, delta: number) => {
     if (!delta || Number.isNaN(delta)) return;
     const target = users.find((u) => u.id === id);
     if (!target) return;
     const next = Math.max(0, target.balance + delta);
-    setUsers(users.map((u) => (u.id === id ? { ...u, balance: next } : u)));
+    const { error } = await supabase.from("profiles").update({ balance: next }).eq("id", id);
+    if (error) {
+      toast.error("COULD NOT UPDATE WALLET");
+      return;
+    }
     pushNotification(
       id,
       delta > 0 ? "PAYMENT ADDED" : "BALANCE UPDATED",
@@ -52,6 +56,8 @@ function UsersAdmin() {
     );
     logActivity("wallet", "ADMIN", `${delta > 0 ? "Added" : "Removed"} $${Math.abs(delta)} for ${target.email}`);
     toast.success(`WALLET UPDATED — $${next.toFixed(2)}`);
+    sync();
+    notify();
   };
 
   const applyCustom = (id: string, sign: 1 | -1) => {
@@ -60,24 +66,23 @@ function UsersAdmin() {
       toast.error("ENTER AN AMOUNT FIRST");
       return;
     }
-    adjust(id, amount * sign);
+    void adjust(id, amount * sign);
     setCustom({ ...custom, [id]: "" });
   };
 
-  const changeRole = (id: string, role: Role) => {
+  const changeRole = async (id: string, role: Role) => {
     const target = users.find((u) => u.id === id);
     if (!target || target.role === role) return;
-    setUsers(users.map((u) => (u.id === id ? { ...u, role } : u)));
+    const { error } = await supabase.rpc("admin_set_role", { _user_id: id, _role: role });
+    if (error) {
+      toast.error("COULD NOT CHANGE ROLE");
+      return;
+    }
     pushNotification(id, "ROLE UPDATED", `Your account role is now ${role.toUpperCase()}.`);
     logActivity("user", "ADMIN", `Changed role of ${target.email} to ${role}`);
     toast.success(`ROLE SET TO ${role.toUpperCase()}`);
-  };
-
-  const remove = (id: string) => {
-    const target = users.find((u) => u.id === id);
-    if (!target || !window.confirm("Remove this member?")) return;
-    setUsers(users.filter((u) => u.id !== id));
-    logActivity("user", "ADMIN", `Removed member ${target.email}`);
+    sync();
+    notify();
   };
 
   return (
@@ -104,7 +109,6 @@ function UsersAdmin() {
                 <th className="p-3">BALANCE</th>
                 <th className="p-3">ORDERS</th>
                 <th className="p-3 text-right">WALLET</th>
-                <th className="p-3 text-right">ACTIONS</th>
               </tr>
             </thead>
             <tbody>
@@ -119,7 +123,7 @@ function UsersAdmin() {
                       value={u.role}
                       aria-label={`Role for ${u.fullName}`}
                       disabled={u.id === me?.id}
-                      onChange={(e) => changeRole(u.id, e.target.value as Role)}
+                      onChange={(e) => void changeRole(u.id, e.target.value as Role)}
                       className={`rounded border border-border bg-background/60 px-2 py-1 text-[10px] outline-none focus:border-primary disabled:opacity-50 ${
                         u.role === "admin" ? "text-gold" : "text-muted-foreground"
                       }`}
@@ -137,7 +141,7 @@ function UsersAdmin() {
                       {QUICK.map((amt) => (
                         <button
                           key={amt}
-                          onClick={() => adjust(u.id, amt)}
+                          onClick={() => void adjust(u.id, amt)}
                           className="rounded border border-border px-2 py-1 text-[10px] text-muted-foreground hover:border-primary hover:text-primary"
                         >
                           +${amt}
@@ -165,19 +169,6 @@ function UsersAdmin() {
                       >
                         DEDUCT
                       </button>
-                    </div>
-                  </td>
-                  <td className="p-3">
-                    <div className="flex justify-end gap-2">
-                      {u.id !== me?.id && (
-                        <button
-                          onClick={() => remove(u.id)}
-                          aria-label={`Remove ${u.fullName}`}
-                          className="rounded border border-danger/50 p-2 text-danger hover:bg-danger/10"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      )}
                     </div>
                   </td>
                 </tr>

@@ -110,7 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email,
       password: data.password,
       options: {
-        emailRedirectTo: `${window.location.origin}/login`,
+        emailRedirectTo: "https://spiderhex-store.vercel.app/login",
         data: {
           full_name: data.fullName.trim(),
           whatsapp: data.whatsapp.trim(),

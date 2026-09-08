@@ -24,6 +24,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
     { to: "/admin", label: "OVERVIEW" },
     { to: "/admin/products", label: "PRODUCTS" },
     { to: "/admin/downloads", label: "DOWNLOADS" },
+    { to: "/admin/redeem", label: "REDEEM CODES" },
     { to: "/admin/users", label: "USERS" },
     { to: "/admin/content", label: "SITE CONTENT" },
     { to: "/admin/notifications", label: "NOTIFICATIONS" },
