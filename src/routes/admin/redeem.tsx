@@ -6,13 +6,11 @@ import { AdminShell } from "@/components/admin-shell";
 import { SectionTitle } from "@/components/shell";
 import { Modal } from "@/components/modal";
 import { useLive } from "@/lib/use-live";
-import { logActivity } from "@/lib/spiderhex";
+import { logActivity, getUserById } from "@/lib/spiderhex";
 import { createCode, deleteCode, generateCode, listAllCodes, type RedeemCode, type DownloadFile } from "@/lib/redeem";
 
-// ✅ FIX: Use the correct route name based on file location
-// Since file is at src/routes/admin/redeem-codes.tsx
-// The route should be "/admin/redeem-codes"
-export const Route = createFileRoute("/admin/redeem")({
+// ✅ Fixed route name
+export const Route = createFileRoute("/admin/redeem-codes")({
   component: () => (
     <AdminShell>
       <RedeemAdmin />
@@ -42,6 +40,9 @@ function RedeemAdmin() {
   const [usageLimit, setUsageLimit] = useState(1);
   const [files, setFiles] = useState<DownloadFile[]>([]);
   const [busy, setBusy] = useState(false);
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [selectedCode, setSelectedCode] = useState<RedeemCode | null>(null);
+  const [userDetails, setUserDetails] = useState<{ email: string; fullName: string } | null>(null);
 
   const load = useCallback(() => {
     void listAllCodes().then(setCodes);
@@ -90,8 +91,6 @@ function RedeemAdmin() {
       return;
     }
     setBusy(true);
-    
-    // ✅ FIX: Pass all required fields including usageLimit and files
     const err = await createCode({ 
       code, 
       productId: productId || null, 
@@ -99,10 +98,9 @@ function RedeemAdmin() {
       downloadLink, 
       accessKey, 
       note,
-      usageLimit, // ✅ Added this
-      files: files || [] // ✅ Added this
+      usageLimit,
+      files: files || []
     });
-    
     setBusy(false);
     if (err) {
       toast.error(/duplicate|unique/i.test(err) ? "THAT CODE ALREADY EXISTS" : err.toUpperCase());
@@ -141,6 +139,21 @@ function RedeemAdmin() {
   const getUsageText = (c: RedeemCode) => {
     if (c.usage_limit === -1) return `∞ used: ${c.usage_count}`;
     return `${c.usage_count}/${c.usage_limit}`;
+  };
+
+  const viewUsers = async (code: RedeemCode) => {
+    if (!code.claimed_by) {
+      toast.info('NO ONE HAS USED THIS CODE YET');
+      return;
+    }
+    setSelectedCode(code);
+    const user = await getUserById(code.claimed_by);
+    if (user) {
+      setUserDetails(user);
+      setShowUserModal(true);
+    } else {
+      toast.error('USER NOT FOUND');
+    }
   };
 
   return (
@@ -340,6 +353,15 @@ function RedeemAdmin() {
                   </td>
                   <td className="p-3">
                     <div className="flex justify-end gap-2">
+                      {c.claimed_by && (
+                        <button
+                          onClick={() => viewUsers(c)}
+                          className="rounded border border-primary/50 p-2 text-primary hover:bg-primary/10"
+                          title="View who used this code"
+                        >
+                          👤
+                        </button>
+                      )}
                       <button
                         onClick={() => void copy(c.code)}
                         aria-label={`Copy ${c.code}`}
@@ -362,6 +384,54 @@ function RedeemAdmin() {
           </table>
         )}
       </div>
+
+      <Modal
+        open={showUserModal}
+        onClose={() => {
+          setShowUserModal(false);
+          setSelectedCode(null);
+          setUserDetails(null);
+        }}
+        sub="// CLAIMED BY"
+        title={selectedCode?.code || 'CODE DETAILS'}
+        footer={
+          <button
+            onClick={() => {
+              setShowUserModal(false);
+              setSelectedCode(null);
+              setUserDetails(null);
+            }}
+            className="rounded border border-border px-4 py-2 text-[11px] text-muted-foreground hover:text-primary"
+          >
+            CLOSE
+          </button>
+        }
+      >
+        {userDetails ? (
+          <div className="space-y-4 p-2">
+            <div className="bg-accent/20 rounded p-4 border border-primary/30">
+              <p className="text-[10px] text-muted-foreground">EMAIL</p>
+              <p className="text-sm font-mono text-primary break-all">{userDetails.email}</p>
+            </div>
+            <div className="bg-accent/20 rounded p-4 border border-primary/30">
+              <p className="text-[10px] text-muted-foreground">FULL NAME</p>
+              <p className="text-sm font-mono text-foreground">{userDetails.fullName}</p>
+            </div>
+            <div className="bg-accent/20 rounded p-4 border border-primary/30">
+              <p className="text-[10px] text-muted-foreground">REDEEMED AT</p>
+              <p className="text-sm font-mono text-foreground">
+                {selectedCode?.claimed_at ? new Date(selectedCode.claimed_at).toLocaleString() : 'Unknown'}
+              </p>
+            </div>
+            <div className="bg-accent/20 rounded p-4 border border-primary/30">
+              <p className="text-[10px] text-muted-foreground">PRODUCT</p>
+              <p className="text-sm font-mono text-foreground">{selectedCode?.product_name}</p>
+            </div>
+          </div>
+        ) : (
+          <p className="text-center text-muted-foreground">LOADING...</p>
+        )}
+      </Modal>
     </>
   );
 }

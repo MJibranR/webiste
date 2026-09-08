@@ -38,7 +38,6 @@ function RedeemPage() {
     if (!user) return;
     setLoadingRedeemed(true);
     try {
-      // Get ALL codes this user has redeemed (claimed_by = user.id)
       const { data, error } = await supabase
         .from('redeem_codes')
         .select('*')
@@ -75,7 +74,7 @@ function RedeemPage() {
     if (result.success) {
       toast.success(result.message);
       setCode("");
-      loadRedeemed(); // Refresh the list
+      loadRedeemed();
     } else {
       toast.error(result.message);
     }

@@ -48,7 +48,23 @@ export async function listAllCodes(): Promise<RedeemCode[]> {
     return [];
   }
   
-  return data || [];
+  // Map the data to include default values for missing fields
+  return (data || []).map((item: any) => ({
+    id: item.id,
+    code: item.code,
+    product_id: item.product_id || null,
+    product_name: item.product_name || 'Unknown',
+    download_link: item.download_link || '',
+    access_key: item.access_key || '',
+    note: item.note || '',
+    created_by: item.created_by || null,
+    created_at: item.created_at || new Date().toISOString(),
+    claimed_by: item.claimed_by || null,
+    claimed_at: item.claimed_at || null,
+    usage_limit: item.usage_limit ?? 1,
+    usage_count: item.usage_count ?? 0,
+    files: item.files || null,
+  }));
 }
 
 export async function createCode(data: {
@@ -62,7 +78,6 @@ export async function createCode(data: {
   files: DownloadFile[];
 }): Promise<string | null> {
   try {
-    // Ensure files is always an array
     const filesArray = data.files || [];
     const filesJson = filesArray.length > 0 ? JSON.stringify(filesArray) : null;
     
@@ -78,12 +93,9 @@ export async function createCode(data: {
       created_at: new Date().toISOString(),
     };
 
-    // Only add product_id if it's provided and not empty
     if (data.productId && data.productId.trim() !== '') {
       insertData.product_id = data.productId;
     }
-
-    console.log('Inserting redeem code:', insertData);
 
     const { error } = await supabase
       .from('redeem_codes')
@@ -113,57 +125,6 @@ export async function deleteCode(id: string): Promise<string | null> {
   return null;
 }
 
-export async function getRedeemCodeUsers(codeId: string): Promise<{ email: string; fullName: string; claimed_at: string }[]> {
-  try {
-    // First get the code details
-    const { data: codeData, error: codeError } = await supabase
-      .from('redeem_codes')
-      .select('claimed_by, claimed_at')
-      .eq('id', codeId)
-      .single();
-    
-    if (codeError || !codeData) {
-      return [];
-    }
-    
-    // If no one claimed it yet
-    if (!codeData.claimed_by) {
-      return [];
-    }
-    
-    // Get the user details
-    const { data: userData, error: userError } = await supabase
-      .from('profiles')
-      .select('email, full_name')
-      .eq('id', codeData.claimed_by)
-      .single();
-    
-    if (userError || !userData) {
-      return [];
-    }
-    
-    return [{
-      email: userData.email || 'Unknown',
-      fullName: userData.full_name || 'Unknown User',
-      claimed_at: codeData.claimed_at || new Date().toISOString(),
-    }];
-  } catch (error) {
-    console.error('Error fetching redeem code users:', error);
-    return [];
-  }
-}
-
-export async function getRedeemCodeAllUsers(codeId: string): Promise<{ email: string; fullName: string; claimed_at: string }[]> {
-  try {
-    // Since we don't have a usage history table yet, we'll return the main user
-    // If you want to track every use, you'd need to create a redeem_code_usage table
-    return await getRedeemCodeUsers(codeId);
-  } catch (error) {
-    console.error('Error fetching all users:', error);
-    return [];
-  }
-}
-
 export async function redeemCodeAction(code: string, userId: string): Promise<{ 
   success: boolean; 
   message: string; 
@@ -175,7 +136,6 @@ export async function redeemCodeAction(code: string, userId: string): Promise<{
   } 
 }> {
   try {
-    // First, get the code
     const { data: codes, error: fetchError } = await supabase
       .from('redeem_codes')
       .select('*')
@@ -187,30 +147,25 @@ export async function redeemCodeAction(code: string, userId: string): Promise<{
     
     const redeem = codes[0];
     
-    // ✅ CHECK: Has this specific code already been used by ANYONE?
-    const currentUsage = redeem.usage_count || 0;
-    const maxUsage = redeem.usage_limit || 1;
+    // Safely access properties with defaults
+    const currentUsage = redeem.usage_count ?? 0;
+    const maxUsage = redeem.usage_limit ?? 1;
     
-    // If maxUsage is 1 and currentUsage >= 1, code is already used
     if (maxUsage === 1 && currentUsage >= 1) {
       return { success: false, message: 'THIS CODE HAS ALREADY BEEN USED' };
     }
     
-    // If maxUsage > 1, check if it's reached its limit
     if (maxUsage !== -1 && currentUsage >= maxUsage) {
       return { success: false, message: 'CODE HAS REACHED MAXIMUM USES' };
     }
     
-    // ✅ Also check if this specific user already used this specific code
     if (redeem.claimed_by === userId) {
       return { success: false, message: 'YOU ALREADY USED THIS CODE' };
     }
     
-    // Calculate new usage count
     const newCount = currentUsage + 1;
     const isFullyUsed = maxUsage !== -1 && newCount >= maxUsage;
     
-    // Update usage count
     const { error: updateError } = await supabase
       .from('redeem_codes')
       .update({
@@ -225,7 +180,6 @@ export async function redeemCodeAction(code: string, userId: string): Promise<{
       return { success: false, message: 'FAILED TO REDEEM CODE' };
     }
     
-    // Parse files
     let files: DownloadFile[] = [];
     if (redeem.files) {
       try {
@@ -238,7 +192,6 @@ export async function redeemCodeAction(code: string, userId: string): Promise<{
       }
     }
     
-    // If no files but download_link exists, create a file entry
     if (files.length === 0 && redeem.download_link) {
       files = [{ 
         id: 'legacy', 
@@ -252,7 +205,7 @@ export async function redeemCodeAction(code: string, userId: string): Promise<{
       success: true,
       message: isFullyUsed ? 'CODE REDEEMED SUCCESSFULLY' : `REDEEMED (${newCount}/${maxUsage === -1 ? '∞' : maxUsage})`,
       data: {
-        productName: redeem.product_name,
+        productName: redeem.product_name || 'Unknown',
         downloadLink: redeem.download_link || '',
         accessKey: redeem.access_key || '',
         files: files,
@@ -261,28 +214,5 @@ export async function redeemCodeAction(code: string, userId: string): Promise<{
   } catch (err: any) {
     console.error('Error in redeemCodeAction:', err);
     return { success: false, message: err.message || 'REDEEM FAILED' };
-  }
-}
-
-// Function to get user details by ID
-export async function getUserById(userId: string): Promise<{ email: string; fullName: string } | null> {
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('email, full_name')
-      .eq('id', userId)
-      .single();
-    
-    if (error || !data) {
-      return null;
-    }
-    
-    return {
-      email: data.email || 'Unknown',
-      fullName: data.full_name || 'Unknown User',
-    };
-  } catch (error) {
-    console.error('Error fetching user:', error);
-    return null;
   }
 }

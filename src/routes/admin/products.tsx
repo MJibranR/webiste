@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { AdminShell } from "@/components/admin-shell";
 import { SectionTitle } from "@/components/shell";
-import { useLive } from "@/lib/use-live";
-import { CATEGORIES, setProducts, uid, type Product } from "@/lib/spiderhex";
+import { supabase } from "@/integrations/supabase/client";
+import { CATEGORIES, type Product } from "@/lib/spiderhex";
 
 export const Route = createFileRoute("/admin/products")({
   component: () => (
@@ -16,10 +17,6 @@ export const Route = createFileRoute("/admin/products")({
     meta: [
       { title: "Manage Panels — SPIDER HEX Admin" },
       { name: "description", content: "Create, edit and remove SPIDER HEX gaming panels, prices and stock status." },
-      { property: "og:title", content: "Manage Panels — SPIDER HEX Admin" },
-      { property: "og:description", content: "Full control over the panel catalog." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
 });
@@ -38,22 +35,132 @@ const empty = (): Product => ({
 const field = "w-full rounded border border-border bg-background/60 px-3 py-2 text-xs text-foreground outline-none focus:border-primary";
 
 function ProductsAdmin() {
-  const { products } = useLive();
+  const [products, setProducts] = useState<Product[]>([]);
   const [draft, setDraft] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const save = () => {
-    if (!draft || !draft.name.trim()) return;
-    const list = draft.id
-      ? products.map((p) => (p.id === draft.id ? draft : p))
-      : [...products, { ...draft, id: uid() }];
-    setProducts(list);
-    setDraft(null);
+  // Load products from database
+  const loadProducts = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: true });
+      
+      if (error) {
+        console.error('Error loading products:', error);
+        toast.error('Failed to load products');
+        setProducts([]);
+      } else {
+        const mappedProducts: Product[] = (data || []).map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          price: p.price,
+          category: p.category,
+          badge: p.badge || 'NEW',
+          inStock: p.in_stock !== false,
+          downloadLink: p.download_link || '',
+          imageUrl: p.image_url || '',
+        }));
+        setProducts(mappedProducts);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      setProducts([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const remove = (id: string) => {
-    if (!window.confirm("Delete this panel?")) return;
-    setProducts(products.filter((p) => p.id !== id));
+  useEffect(() => {
+    loadProducts();
+  }, []);
+
+  const save = async () => {
+    if (!draft || !draft.name.trim()) {
+      toast.error('Product name is required');
+      return;
+    }
+
+    const productData = {
+      name: draft.name.trim(),
+      price: draft.price,
+      category: draft.category,
+      badge: draft.badge || 'NEW',
+      in_stock: draft.inStock,
+      download_link: draft.downloadLink || '',
+      image_url: draft.imageUrl || '',
+    };
+
+    try {
+      let error;
+      if (draft.id) {
+        // Update existing product - don't include updated_at
+        const { error: updateError } = await supabase
+          .from('products')
+          .update(productData)
+          .eq('id', draft.id);
+        error = updateError;
+        if (!error) toast.success('PRODUCT UPDATED');
+      } else {
+        // Insert new product - don't include id or updated_at
+        const { error: insertError } = await supabase
+          .from('products')
+          .insert({
+            ...productData,
+            created_at: new Date().toISOString(),
+          });
+        error = insertError;
+        if (!error) toast.success('PRODUCT CREATED');
+      }
+
+      if (error) {
+        console.error('Error saving product:', error);
+        toast.error('Failed to save product');
+        return;
+      }
+
+      setDraft(null);
+      loadProducts();
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Failed to save product');
+    }
   };
+
+  const remove = async (id: string) => {
+    if (!window.confirm("Delete this product?")) return;
+    
+    try {
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', id);
+      
+      if (error) {
+        toast.error('Failed to delete product');
+        return;
+      }
+      
+      toast.success('PRODUCT DELETED');
+      loadProducts();
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Failed to delete product');
+    }
+  };
+
+  if (loading) {
+    return (
+      <AdminShell>
+        <SectionTitle sub="// CATALOG CONTROL">PANELS</SectionTitle>
+        <div className="flex justify-center items-center py-20">
+          <p className="text-sm text-muted-foreground">LOADING PRODUCTS...</p>
+        </div>
+      </AdminShell>
+    );
+  }
 
   return (
     <>

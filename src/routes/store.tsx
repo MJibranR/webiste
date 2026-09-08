@@ -1,10 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Page, SectionTitle } from "@/components/shell";
 import { useAuth } from "@/lib/auth";
 import { useSettings } from "@/lib/use-settings";
-import { useLive } from "@/lib/use-live";
+import { supabase } from "@/integrations/supabase/client";
 import {
   CATEGORIES,
   buyMessage,
@@ -28,25 +28,59 @@ export const Route = createFileRoute("/store")({
         name: "description",
         content: "Browse SPIDER HEX gaming panels: PC panels, root, non-root, iOS tools and gift keys with lifetime access.",
       },
-      { property: "og:title", content: "Store — SPIDER HEX Gaming Panels" },
-      { property: "og:description", content: "PC, root, non-root and iOS gaming panels with lifetime access." },
     ],
   }),
 });
 
 function StorePage() {
   const { user } = useAuth();
-  const settings = useSettings();
-  const { products, ready } = useLive();
+  const { settings } = useSettings();
   const navigate = useNavigate();
   const [cat, setCat] = useState<string>("ALL");
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // ✅ Load products from Supabase database
+  useEffect(() => {
+    async function loadProducts() {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .order('created_at', { ascending: true });
+        
+        if (error) {
+          console.error('Error loading products:', error);
+          setProducts([]);
+        } else {
+          const mappedProducts: Product[] = (data || []).map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            price: p.price,
+            category: p.category,
+            badge: p.badge || 'NEW',
+            inStock: p.in_stock !== false,
+            downloadLink: p.download_link || '',
+            imageUrl: p.image_url || '',
+          }));
+          setProducts(mappedProducts);
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        setProducts([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadProducts();
+  }, []);
 
   const list = cat === "ALL" ? products : products.filter((p) => p.category === cat);
 
   const record = (product: Product): Purchase | null => {
     if (!user) return null;
     
-    // Create purchase with 'pending' status
     const purchase: Purchase = {
       id: uid(),
       userId: user.id,
@@ -98,6 +132,15 @@ function StorePage() {
     }
   };
 
+  if (loading) {
+    return (
+      <Page>
+        <SectionTitle sub={settings.storeSub}>{settings.storeHeading}</SectionTitle>
+        <p className="mt-8 text-xs text-muted-foreground">LOADING CATALOG...</p>
+      </Page>
+    );
+  }
+
   return (
     <Page>
       <SectionTitle sub={settings.storeSub}>{settings.storeHeading}</SectionTitle>
@@ -118,9 +161,7 @@ function StorePage() {
         ))}
       </div>
 
-      {!ready ? (
-        <p className="mt-8 text-xs text-muted-foreground">LOADING CATALOG...</p>
-      ) : list.length === 0 ? (
+      {list.length === 0 ? (
         <p className="panel mt-8 p-8 text-center text-xs text-muted-foreground">NO PRODUCTS IN THIS CATEGORY</p>
       ) : (
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
