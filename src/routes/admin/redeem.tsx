@@ -10,7 +10,7 @@ import { logActivity, getUserById } from "@/lib/spiderhex";
 import { createCode, deleteCode, generateCode, listAllCodes, type RedeemCode, type DownloadFile } from "@/lib/redeem";
 
 // ✅ Fixed route name
-export const Route = createFileRoute("/admin/redeem-codes")({
+export const Route = createFileRoute("/admin/redeem")({
   component: () => (
     <AdminShell>
       <RedeemAdmin />

@@ -1,3 +1,5 @@
+import { supabase } from "@/integrations/supabase/client";
+
 export type Role = "admin" | "user";
 
 export interface User {
@@ -499,4 +501,28 @@ export const clearActivity = () => setActivity([]);
 export function broadcastNotification(title: string, message: string, actor = "SYSTEM") {
   pushNotification("*", title, message);
   logActivity("notification", actor, `Broadcast: ${title}`);
+}
+
+
+export async function getUserById(userId: string): Promise<{ email: string; fullName: string } | null> {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('email, full_name')
+      .eq('id', userId)
+      .single();
+    
+    if (error || !data) {
+      console.error('Error fetching user:', error);
+      return null;
+    }
+    
+    return {
+      email: data.email || 'Unknown',
+      fullName: data.full_name || 'Unknown User',
+    };
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    return null;
+  }
 }
