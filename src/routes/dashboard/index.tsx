@@ -1,10 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Download, Store, Wallet } from "lucide-react";
+import { useState } from "react";
+import { DownloadModal } from "@/components/download-modal";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { SectionTitle } from "@/components/shell";
 import { useAuth } from "@/lib/auth";
 import { useLive } from "@/lib/use-live";
-import { topUpMessage, waLink } from "@/lib/spiderhex";
+import { purchaseFiles, topUpMessage, waLink, type Purchase } from "@/lib/spiderhex";
 
 export const Route = createFileRoute("/dashboard/")({
   component: DashboardPage,
@@ -29,6 +31,7 @@ function DashboardPage() {
 function DashboardInner() {
   const { user } = useAuth();
   const { purchases } = useLive();
+  const [open, setOpen] = useState<Purchase | null>(null);
   if (!user) return null;
 
   const mine = purchases.filter((p) => p.userId === user.id);
@@ -40,6 +43,7 @@ function DashboardInner() {
 
   return (
     <>
+      <DownloadModal purchase={open} onClose={() => setOpen(null)} />
       <SectionTitle sub={`// WELCOME BACK, ${user.fullName.toUpperCase()}`}>DASHBOARD</SectionTitle>
 
       <div className="panel p-6">
@@ -97,15 +101,13 @@ function DashboardInner() {
                   >
                     {p.status.toUpperCase()}
                   </span>
-                  {p.downloadLink ? (
-                    <a
-                      href={p.downloadLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                  {purchaseFiles(p).length > 0 ? (
+                    <button
+                      onClick={() => setOpen(p)}
                       className="rounded bg-primary px-3 py-2 text-[11px] font-bold text-primary-foreground hover:opacity-90"
                     >
-                      DOWNLOAD
-                    </a>
+                      DOWNLOAD TOOL
+                    </button>
                   ) : (
                     <span className="text-[10px] text-muted-foreground">LINK PENDING</span>
                   )}
