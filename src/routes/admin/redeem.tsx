@@ -1,14 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { Copy, RefreshCw, Trash2 } from "lucide-react";
+import { Copy, RefreshCw, Trash2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { AdminShell } from "@/components/admin-shell";
 import { SectionTitle } from "@/components/shell";
+import { Modal } from "@/components/modal";
 import { useLive } from "@/lib/use-live";
 import { logActivity } from "@/lib/spiderhex";
 import { createCode, deleteCode, generateCode, listAllCodes, type RedeemCode } from "@/lib/redeem";
 
-export const Route = createFileRoute("/admin/redeem")({
+export const Route = createFileRoute("/admin/redeem-codes")({
   component: () => (
     <AdminShell>
       <RedeemAdmin />
@@ -32,6 +33,7 @@ const input =
 function RedeemAdmin() {
   const { products, users } = useLive();
   const [codes, setCodes] = useState<RedeemCode[]>([]);
+  const [showModal, setShowModal] = useState(false);
   const [code, setCode] = useState(generateCode());
   const [productId, setProductId] = useState("");
   const [productName, setProductName] = useState("");
@@ -54,6 +56,15 @@ function RedeemAdmin() {
     }
   };
 
+  const resetForm = () => {
+    setCode(generateCode());
+    setProductId("");
+    setProductName("");
+    setDownloadLink("");
+    setAccessKey("");
+    setNote("");
+  };
+
   const submit = async () => {
     if (!code.trim() || !productName.trim()) {
       toast.error("CODE AND PANEL NAME ARE REQUIRED");
@@ -72,9 +83,8 @@ function RedeemAdmin() {
     }
     logActivity("product", "ADMIN", `Created redeem code ${code.toUpperCase()} for ${productName}`);
     toast.success("REDEEM CODE CREATED");
-    setCode(generateCode());
-    setAccessKey("");
-    setNote("");
+    resetForm();
+    setShowModal(false);
     load();
   };
 
@@ -105,68 +115,116 @@ function RedeemAdmin() {
     <>
       <SectionTitle sub="// ONE CODE = ONE PANEL UNLOCK">REDEEM CODES</SectionTitle>
 
-      <div className="panel p-5">
-        <p className="text-[11px] tracking-[0.2em] text-muted-foreground">CREATE NEW CODE</p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <div>
-            <label className="text-[10px] text-muted-foreground">CODE</label>
-            <div className="mt-1 flex gap-2">
-              <input className={input} value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} />
-              <button
-                onClick={() => setCode(generateCode())}
-                aria-label="Generate code"
-                className="rounded border border-border px-3 text-muted-foreground hover:border-primary hover:text-primary"
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-              </button>
+      <button
+        onClick={() => setShowModal(true)}
+        className="pulse-glow rounded bg-primary px-4 py-2 text-[11px] font-bold text-primary-foreground hover:opacity-90 flex items-center gap-2"
+      >
+        <Plus className="h-4 w-4" /> CREATE NEW CODE
+      </button>
+
+      <Modal
+        open={showModal}
+        onClose={() => {
+          setShowModal(false);
+          resetForm();
+        }}
+        sub="// GENERATE NEW REDEEM CODE"
+        title="CREATE REDEEM CODE"
+        footer={
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              onClick={() => {
+                setShowModal(false);
+                resetForm();
+              }}
+              className="rounded border border-border px-4 py-2 text-[11px] text-muted-foreground hover:text-primary"
+            >
+              CANCEL
+            </button>
+            <button
+              onClick={() => void submit()}
+              disabled={busy}
+              className="rounded bg-primary px-5 py-2 text-[11px] font-bold text-primary-foreground hover:opacity-90 disabled:opacity-60"
+            >
+              {busy ? "CREATING..." : "GENERATE CODE"}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="block text-[10px] text-muted-foreground mb-1">CODE</label>
+              <div className="flex gap-2">
+                <input 
+                  className={input} 
+                  value={code} 
+                  onChange={(e) => setCode(e.target.value.toUpperCase())} 
+                  placeholder="SPX-XXXX-XXXX"
+                />
+                <button
+                  onClick={() => setCode(generateCode())}
+                  aria-label="Generate code"
+                  className="rounded border border-border px-3 text-muted-foreground hover:border-primary hover:text-primary flex-shrink-0"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="block text-[10px] text-muted-foreground mb-1">PANEL</label>
+              <select className={input} value={productId} onChange={(e) => pickProduct(e.target.value)}>
+                <option value="">— CUSTOM / MANUAL —</option>
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
+
           <div>
-            <label className="text-[10px] text-muted-foreground">PANEL</label>
-            <select className={`${input} mt-1`} value={productId} onChange={(e) => pickProduct(e.target.value)}>
-              <option value="">— CUSTOM / MANUAL —</option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+            <label className="block text-[10px] text-muted-foreground mb-1">PANEL NAME</label>
+            <input 
+              className={input} 
+              value={productName} 
+              onChange={(e) => setProductName(e.target.value)} 
+              placeholder="SPIDER PC PANEL"
+            />
           </div>
+
           <div>
-            <label className="text-[10px] text-muted-foreground">PANEL NAME</label>
-            <input className={`${input} mt-1`} value={productName} onChange={(e) => setProductName(e.target.value)} />
-          </div>
-          <div>
-            <label className="text-[10px] text-muted-foreground">ACCESS KEY</label>
+            <label className="block text-[10px] text-muted-foreground mb-1">ACCESS KEY / CREDENTIALS</label>
             <input
-              className={`${input} mt-1`}
-              placeholder="KEY GIVEN TO THE MEMBER"
+              className={input}
+              placeholder="username:password or license key"
               value={accessKey}
               onChange={(e) => setAccessKey(e.target.value)}
             />
           </div>
-          <div className="sm:col-span-2">
-            <label className="text-[10px] text-muted-foreground">DOWNLOAD LINK</label>
+
+          <div>
+            <label className="block text-[10px] text-muted-foreground mb-1">DOWNLOAD LINK</label>
             <input
-              className={`${input} mt-1`}
-              placeholder="https://..."
+              className={input}
+              placeholder="https://example.com/download.zip"
               value={downloadLink}
               onChange={(e) => setDownloadLink(e.target.value)}
             />
           </div>
-          <div className="sm:col-span-2">
-            <label className="text-[10px] text-muted-foreground">NOTE (OPTIONAL)</label>
-            <input className={`${input} mt-1`} value={note} onChange={(e) => setNote(e.target.value)} />
+
+          <div>
+            <label className="block text-[10px] text-muted-foreground mb-1">NOTE (OPTIONAL)</label>
+            <input 
+              className={input} 
+              placeholder="Add a note for this code" 
+              value={note} 
+              onChange={(e) => setNote(e.target.value)} 
+            />
           </div>
         </div>
-        <button
-          onClick={() => void submit()}
-          disabled={busy}
-          className="mt-4 rounded bg-primary px-4 py-2 text-[11px] font-bold text-primary-foreground hover:opacity-90 disabled:opacity-60"
-        >
-          {busy ? "CREATING…" : "CREATE CODE"}
-        </button>
-      </div>
+      </Modal>
 
       <div className="panel mt-6 overflow-x-auto">
         {codes.length === 0 ? (
