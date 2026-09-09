@@ -14,11 +14,63 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_log: {
+        Row: {
+          actor: string
+          created_at: string
+          id: string
+          message: string
+          type: string
+        }
+        Insert: {
+          actor?: string
+          created_at?: string
+          id?: string
+          message?: string
+          type?: string
+        }
+        Update: {
+          actor?: string
+          created_at?: string
+          id?: string
+          message?: string
+          type?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          read_by: string[]
+          title: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message?: string
+          read_by?: string[]
+          title?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          read_by?: string[]
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           badge: string
           category: string
           created_at: string
+          description: string
           download_link: string
           files: Json
           id: string
@@ -26,23 +78,31 @@ export type Database = {
           in_stock: boolean
           name: string
           price: number
+          price_monthly: number | null
+          price_weekly: number | null
+          video_url: string
         }
         Insert: {
           badge?: string
           category: string
           created_at?: string
+          description?: string
           download_link?: string
           files?: Json
-          id: string
+          id?: string
           image_url?: string | null
           in_stock?: boolean
           name: string
           price: number
+          price_monthly?: number | null
+          price_weekly?: number | null
+          video_url?: string
         }
         Update: {
           badge?: string
           category?: string
           created_at?: string
+          description?: string
           download_link?: string
           files?: Json
           id?: string
@@ -50,6 +110,9 @@ export type Database = {
           in_stock?: boolean
           name?: string
           price?: number
+          price_monthly?: number | null
+          price_weekly?: number | null
+          video_url?: string
         }
         Relationships: []
       }
@@ -89,6 +152,51 @@ export type Database = {
           username?: string | null
           whatsapp?: string | null
           xp?: number
+        }
+        Relationships: []
+      }
+      purchases: {
+        Row: {
+          credentials: string
+          download_link: string
+          files: Json
+          id: string
+          is_redeem: boolean
+          plan: string
+          price: number
+          product_id: string | null
+          product_name: string
+          purchase_date: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          credentials?: string
+          download_link?: string
+          files?: Json
+          id?: string
+          is_redeem?: boolean
+          plan?: string
+          price?: number
+          product_id?: string | null
+          product_name?: string
+          purchase_date?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          credentials?: string
+          download_link?: string
+          files?: Json
+          id?: string
+          is_redeem?: boolean
+          plan?: string
+          price?: number
+          product_id?: string | null
+          product_name?: string
+          purchase_date?: string
+          status?: string
+          user_id?: string
         }
         Relationships: []
       }
