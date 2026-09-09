@@ -41,15 +41,29 @@ function RedeemPage() {
     if (!user) return;
     setLoadingRedeemed(true);
     try {
+      // ✅ FIX: Query purchases table instead of redeem_codes
+      // This shows ALL products the user has redeemed
       const { data, error } = await supabase
-        .from('redeem_codes')
+        .from('purchases')
         .select('*')
-        .eq('claimed_by', user.id)
-        .order('claimed_at', { ascending: false });
+        .eq('user_id', user.id)
+        .eq('is_redeem', true)
+        .order('purchase_date', { ascending: false });
       
       if (error) {
         console.error('Error loading redeemed codes:', error);
+        // Fallback: Try loading from redeem_codes
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('redeem_codes')
+          .select('*')
+          .eq('claimed_by', user.id)
+          .order('claimed_at', { ascending: false });
+        
+        if (!fallbackError) {
+          setRedeemed(fallbackData || []);
+        }
       } else {
+        console.log('📦 Redeemed purchases:', data);
         setRedeemed(data || []);
       }
     } catch (error) {
@@ -76,7 +90,6 @@ function RedeemPage() {
       console.log('Redeem result:', result);
       
       if (result.success && result.data) {
-        // ✅ Create a purchase-like object for the popup
         const purchase: Purchase = {
           id: `redeem-${Date.now()}`,
           userId: user.id,
@@ -92,11 +105,11 @@ function RedeemPage() {
           credentials: result.data.accessKey || '',
         };
         
-        // ✅ Show the popup
         setRedeemPopup(purchase);
         toast.success(result.message);
         setCode("");
-        loadRedeemed();
+        // ✅ Refresh the list immediately
+        await loadRedeemed();
       } else {
         toast.error(result.message);
       }
@@ -108,21 +121,43 @@ function RedeemPage() {
     }
   };
 
-  const getFiles = (c: any) => {
-    if (c.files) {
+  const getFiles = (item: any) => {
+    // ✅ Handle both purchases and redeem_codes format
+    let filesData = item.files;
+    if (typeof filesData === 'string') {
       try {
-        const parsed = JSON.parse(c.files);
-        return Array.isArray(parsed) ? parsed : [];
+        filesData = JSON.parse(filesData);
       } catch {
-        return [];
+        filesData = [];
       }
     }
-    return c.download_link ? [{ id: 'legacy', label: 'DOWNLOAD', tag: 'MAIN', url: c.download_link }] : [];
+    if (Array.isArray(filesData) && filesData.length > 0) {
+      return filesData;
+    }
+    if (item.download_link) {
+      return [{ id: 'legacy', label: 'DOWNLOAD', tag: 'MAIN', url: item.download_link }];
+    }
+    return [];
+  };
+
+  const getProductName = (item: any) => {
+    return item.product_name || item.productName || 'Unknown Panel';
+  };
+
+  const getAccessKey = (item: any) => {
+    return item.access_key || item.credentials || '';
+  };
+
+  const getRedeemedDate = (item: any) => {
+    return item.claimed_at || item.purchase_date || item.created_at || new Date().toISOString();
+  };
+
+  const getCodeValue = (item: any) => {
+    return item.code || 'N/A';
   };
 
   return (
     <>
-      {/* ✅ Redeem Popup */}
       <DownloadModal purchase={redeemPopup} onClose={() => setRedeemPopup(null)} />
 
       <SectionTitle sub="// REDEEM YOUR PANEL ACCESS">REDEEM CODE</SectionTitle>
@@ -166,36 +201,43 @@ function RedeemPage() {
             YOUR REDEEMED CODES ({redeemed.length})
           </h3>
           <div className="space-y-3">
-            {redeemed.map((item) => {
+            {redeemed.map((item, index) => {
               const files = getFiles(item);
+              const productName = getProductName(item);
+              const accessKey = getAccessKey(item);
+              const redeemedDate = getRedeemedDate(item);
+              const codeValue = getCodeValue(item);
+              
               return (
-                <div key={item.id} className="panel p-4 border border-primary/20">
+                <div key={item.id || index} className="panel p-4 border border-primary/20">
                   <div className="flex flex-wrap justify-between items-start gap-3">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 flex-wrap">
                         <span className="text-lg">✅</span>
-                        <p className="text-sm font-bold text-primary">{item.product_name}</p>
-                        <span className="text-[10px] text-muted-foreground font-mono">({item.code})</span>
-                        {item.usage_limit > 1 && (
+                        <p className="text-sm font-bold text-primary">{productName}</p>
+                        {codeValue && codeValue !== 'N/A' && (
+                          <span className="text-[10px] text-muted-foreground font-mono">({codeValue})</span>
+                        )}
+                        {item.usage_limit && item.usage_limit > 1 && (
                           <span className="text-[10px] text-gold">× {item.usage_count}/{item.usage_limit === -1 ? '∞' : item.usage_limit}</span>
                         )}
                       </div>
                       <p className="text-[10px] text-muted-foreground mt-1">
-                        Redeemed: {item.claimed_at ? new Date(item.claimed_at).toLocaleString() : 'Unknown'}
+                        Redeemed: {new Date(redeemedDate).toLocaleString()}
                       </p>
-                      {item.access_key && (
+                      {accessKey && (
                         <div className="mt-2 bg-accent/40 rounded p-2 border border-border/60">
                           <p className="text-[10px] text-muted-foreground">ACCESS KEY</p>
-                          <p className="text-xs text-gold font-mono break-all">{item.access_key}</p>
+                          <p className="text-xs text-gold font-mono break-all">{accessKey}</p>
                         </div>
                       )}
                       {files.length > 0 && (
                         <div className="mt-2 space-y-1">
                           <p className="text-[10px] text-muted-foreground">DOWNLOAD LINKS</p>
                           <div className="flex flex-wrap gap-2">
-                            {files.map((f: any) => (
+                            {files.map((f: any, idx: number) => (
                               <a
-                                key={f.id}
+                                key={f.id || idx}
                                 href={f.url}
                                 target="_blank"
                                 rel="noopener noreferrer"

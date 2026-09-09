@@ -83,7 +83,7 @@ export async function createCode(data: {
     const insertData: any = {
       code: data.code.toUpperCase().trim(),
       product_name: data.productName || 'Unknown Panel',
-      download_link: '',
+      download_link: data.downloadLink || '',
       access_key: data.accessKey || '',
       note: data.note || '',
       usage_limit: data.usageLimit || 1,
@@ -136,7 +136,7 @@ export async function redeemCodeAction(code: string, userId: string): Promise<{
 }> {
   try {
     const cleanCode = code.trim().toUpperCase();
-    console.log('🔍 Redeeming code:', cleanCode, 'for user:', userId);
+    console.log('🔍 Redeem called with:', { cleanCode, userId });
     
     // ✅ Get the code
     const { data: codes, error: fetchError } = await supabase
@@ -145,13 +145,19 @@ export async function redeemCodeAction(code: string, userId: string): Promise<{
       .eq('code', cleanCode);
     
     if (fetchError) {
-      console.error('Fetch error:', fetchError);
-      return { success: false, message: 'DATABASE ERROR' };
+      console.error('❌ Fetch error:', fetchError);
+      return { 
+        success: false, 
+        message: 'DATABASE ERROR: ' + fetchError.message 
+      };
     }
     
     if (!codes || codes.length === 0) {
       console.log('❌ Code not found:', cleanCode);
-      return { success: false, message: 'INVALID CODE' };
+      return { 
+        success: false, 
+        message: 'INVALID CODE - Code not found in database' 
+      };
     }
     
     const redeem = codes[0];
@@ -161,35 +167,57 @@ export async function redeemCodeAction(code: string, userId: string): Promise<{
     const currentUsage = redeem.usage_count || 0;
     const maxUsage = redeem.usage_limit || 1;
     
-    console.log('📊 Usage:', currentUsage, '/', maxUsage);
+    console.log('📊 Usage:', currentUsage, '/', maxUsage === -1 ? '∞' : maxUsage);
     
+    // ✅ FIX: Handle unlimited usage (-1) correctly
     if (maxUsage !== -1 && currentUsage >= maxUsage) {
-      return { success: false, message: 'CODE HAS REACHED MAXIMUM USES' };
+      console.log('❌ Code usage limit reached');
+      return { 
+        success: false, 
+        message: 'CODE HAS REACHED MAXIMUM USES' 
+      };
     }
     
-    // ✅ CHECK 2: Did this user already use this code?
-    if (redeem.claimed_by === userId) {
-      return { success: false, message: 'YOU ALREADY USED THIS CODE' };
+    // ✅ CHECK 2: Did this user already use this code? (Only if claimed_by is set)
+    if (redeem.claimed_by && redeem.claimed_by === userId) {
+      console.log('❌ User already used this code');
+      return { 
+        success: false, 
+        message: 'YOU ALREADY USED THIS CODE' 
+      };
     }
     
     // ✅ UPDATE: Increment usage count
     const newCount = currentUsage + 1;
+    // ✅ FIX: Only mark as fully used if maxUsage is NOT -1 (unlimited)
     const isFullyUsed = maxUsage !== -1 && newCount >= maxUsage;
     
     console.log('🔄 Updating usage to:', newCount, 'Fully used:', isFullyUsed);
     
+    // ✅ Build update data
+    const updateData: any = {
+      usage_count: newCount,
+    };
+    
+    // ✅ Only set claimed_by/claimed_at if the code is fully used OR if it's a single-use code
+    if (isFullyUsed || maxUsage === 1) {
+      updateData.claimed_by = userId;
+      updateData.claimed_at = new Date().toISOString();
+    }
+    // ✅ For unlimited codes (-1), don't set claimed_by so others can still use it
+    // But we DO track usage_count so we know how many times it's been used
+    
     const { error: updateError } = await supabase
       .from('redeem_codes')
-      .update({
-        usage_count: newCount,
-        claimed_by: isFullyUsed ? userId : null,
-        claimed_at: isFullyUsed ? new Date().toISOString() : null,
-      })
+      .update(updateData)
       .eq('id', redeem.id);
     
     if (updateError) {
-      console.error('Error updating redeem code:', updateError);
-      return { success: false, message: 'FAILED TO REDEEM CODE' };
+      console.error('❌ Update error:', updateError);
+      return { 
+        success: false, 
+        message: 'FAILED TO REDEEM CODE: ' + updateError.message 
+      };
     }
     
     // ✅ PARSE FILES
@@ -222,7 +250,7 @@ export async function redeemCodeAction(code: string, userId: string): Promise<{
       plan: 'REDEEM',
       price: 0,
       status: 'active',
-      download_link: '',
+      download_link: redeem.download_link || '',
       files: files as any,
       credentials: redeem.access_key || '',
       is_redeem: true,
@@ -235,7 +263,7 @@ export async function redeemCodeAction(code: string, userId: string): Promise<{
       .insert(purchaseData);
     
     if (purchaseError) {
-      console.error('Error creating purchase for redeem:', purchaseError);
+      console.error('❌ Error creating purchase for redeem:', purchaseError);
       // Continue anyway - the redeem was successful
     }
     
@@ -252,8 +280,11 @@ export async function redeemCodeAction(code: string, userId: string): Promise<{
       }
     };
   } catch (err: any) {
-    console.error('Error in redeemCodeAction:', err);
-    return { success: false, message: err.message || 'REDEEM FAILED' };
+    console.error('❌ Error in redeemCodeAction:', err);
+    return { 
+      success: false, 
+      message: err.message || 'REDEEM FAILED' 
+    };
   }
 }
 
