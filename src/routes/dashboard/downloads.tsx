@@ -169,20 +169,16 @@ function Downloads() {
                     {p.status.toUpperCase()}
                   </span>
                   {count > 0 && p.status === 'active' ? (
-                    <button 
+                    <button
                       onClick={() => setOpenModal(p)}
-                      className="pulse-glow rounded-lg bg-primary px-4 py-2 text-[11px] font-bold text-primary-foreground hover:opacity-90 transition flex items-center gap-2 shadow-lg shadow-primary/20"
+                      className="pulse-glow rounded bg-primary px-4 py-2 text-[11px] font-bold text-primary-foreground hover:opacity-90 flex items-center gap-1.5"
                     >
-                      <Download className="h-4 w-4" /> DOWNLOAD ({count})
+                      <Download className="h-3.5 w-3.5" /> DOWNLOAD ({count})
                     </button>
                   ) : p.status === 'pending' ? (
-                    <span className="text-[10px] text-gold flex items-center gap-1.5 bg-gold/5 px-3 py-1.5 rounded-full border border-gold/20">
-                      <Clock className="h-3.5 w-3.5" /> WAITING FOR ADMIN
-                    </span>
+                    <span className="text-[10px] text-gold border border-gold/50 px-2 py-1 rounded">⏳ WAITING FOR ADMIN</span>
                   ) : (
-                    <span className="text-[10px] text-muted-foreground flex items-center gap-1.5 bg-background/30 px-3 py-1.5 rounded-full border border-border">
-                      <Clock className="h-3.5 w-3.5" /> AWAITING LINK
-                    </span>
+                    <span className="text-[10px] text-muted-foreground">⏳ AWAITING ADMIN LINK</span>
                   )}
                 </div>
               </div>
