@@ -1,4 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
+import { cachedSettings, DEFAULT_SETTINGS, type SiteSettings, type VideoItem } from "./settings";
+
+export type { SiteSettings, VideoItem };
+export { DEFAULT_SETTINGS };
 
 export type Role = "admin" | "user";
 
@@ -28,12 +32,15 @@ export interface Product {
   id: string;
   name: string;
   price: number;
+  priceMonthly: number | null;
+  priceWeekly: number | null;
   category: string;
   badge: string;
   inStock: boolean;
   downloadLink: string;
-  imageUrl?: string;
-  files?: DownloadFile[];
+  imageUrl: string;
+  description: string;
+  videoUrl: string;
 }
 
 export interface Purchase {
@@ -41,6 +48,7 @@ export interface Purchase {
   userId: string;
   productId: string;
   productName: string;
+  plan: string;
   price: number;
   purchaseDate: string;
   status: "active" | "expired" | "pending";
@@ -50,383 +58,6 @@ export interface Purchase {
   credentials?: string;
 }
 
-/** Redeem Code Interface */
-export interface RedeemCode {
-  id: string;
-  code: string;
-  productName: string;
-  downloadLink: string;
-  credentials: string;
-  createdBy: string;
-  createdAt: string;
-  used: boolean;
-  usedBy?: string;
-  usedAt?: string;
-  expiresAt?: string;
-}
-
-/** All download rows for an order, falling back to the legacy single link. */
-export const purchaseFiles = (p: Purchase): DownloadFile[] => {
-  if (p.files && p.files.length > 0) return p.files;
-  if (p.downloadLink) return [{ id: "legacy", label: "MAIN DOWNLOAD", tag: "OFFICIAL", url: p.downloadLink }];
-  return [];
-};
-
-export const CATEGORIES = [
-  "ALL",
-  "PC PANEL",
-  "NON ROOT",
-  "ROOT",
-  "IOS PANEL",
-  "OTHERS ITEM",
-] as const;
-
-const K_USERS = "sh_users";
-const K_PRODUCTS = "sh_products";
-const K_PURCHASES = "sh_purchases";
-const K_SESSION = "sh_session";
-const K_REDEEM_CODES = "sh_redeem_codes";
-const K_SETTINGS = "sh_settings";
-const K_NOTIFICATIONS = "sh_notifications";
-const K_ACTIVITY = "sh_activity";
-
-const isBrowser = () => typeof window !== "undefined" && typeof window.localStorage !== "undefined";
-
-function read<T>(key: string, fallback: T): T {
-  if (!isBrowser()) return fallback;
-  try {
-    const raw = window.localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function write<T>(key: string, value: T) {
-  if (!isBrowser()) return;
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value));
-    window.dispatchEvent(new Event("sh:update"));
-  } catch {
-    /* storage unavailable */
-  }
-}
-
-export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-
-const ADMIN: User = {
-  id: "admin-root",
-  email: "admin@spiderhex.com",
-  fullName: "Spider Admin",
-  whatsapp: "",
-  password: "admin123",
-  role: "admin",
-  balance: 0,
-  totalSpent: 0,
-  level: 99,
-  xp: 9999,
-  username: "spiderhex_admin",
-};
-
-const SEED_PRODUCTS: Product[] = [
-  { id: "p1", name: "SPIDER PC PANEL", price: 25, category: "PC PANEL", badge: "HOT", inStock: true, downloadLink: "" },
-  { id: "p2", name: "HEX NON ROOT MOD", price: 15, category: "NON ROOT", badge: "NEW", inStock: true, downloadLink: "" },
-  { id: "p3", name: "VENOM ROOT PANEL", price: 30, category: "ROOT", badge: "PRO", inStock: true, downloadLink: "" },
-  { id: "p4", name: "IOS SPIDER TOOL", price: 40, category: "IOS PANEL", badge: "ELITE", inStock: true, downloadLink: "" },
-  { id: "p5", name: "GIFT KEY BUNDLE", price: 10, category: "OTHERS ITEM", badge: "SALE", inStock: true, downloadLink: "" },
-  { id: "p6", name: "WEB HEX PANEL", price: 20, category: "PC PANEL", badge: "TOP", inStock: true, downloadLink: "" },
-];
-
-export function ensureSeed() {
-  if (!isBrowser()) return;
-  const users = read<User[]>(K_USERS, []);
-  if (!users.some((u) => u.email === ADMIN.email)) write(K_USERS, [ADMIN, ...users]);
-  if (!window.localStorage.getItem(K_PRODUCTS)) write(K_PRODUCTS, SEED_PRODUCTS);
-}
-
-export function notify() {
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new Event('sh:update'));
-  }
-}
-
-export const getUsers = () => read<User[]>(K_USERS, []);
-export const setUsers = (u: User[]) => write(K_USERS, u);
-export const getProducts = () => read<Product[]>(K_PRODUCTS, []);
-export const setProducts = (p: Product[]) => write(K_PRODUCTS, p);
-
-export const getPurchases = (): Purchase[] => {
-  if (!isBrowser()) return [];
-  try {
-    return JSON.parse(localStorage.getItem(K_PURCHASES) || '[]');
-  } catch {
-    return [];
-  }
-};
-
-export const setPurchases = (purchases: Purchase[]) => {
-  if (!isBrowser()) return;
-  localStorage.setItem(K_PURCHASES, JSON.stringify(purchases));
-  window.dispatchEvent(new Event('sh:update'));
-};
-
-export const getSessionId = () => read<string | null>(K_SESSION, null);
-export const setSessionId = (id: string | null) => write(K_SESSION, id);
-
-// -------- REDEEM CODE FUNCTIONS --------
-export const getRedeemCodes = (): RedeemCode[] => read<RedeemCode[]>(K_REDEEM_CODES, []);
-export const setRedeemCodes = (codes: RedeemCode[]) => write(K_REDEEM_CODES, codes);
-
-export function generateRedeemCode(
-  productName: string,
-  downloadLink: string,
-  credentials: string,
-  adminEmail: string,
-  expiresIn?: number
-): RedeemCode {
-  const code = `HEX-${Math.random().toString(36).slice(2, 8).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-  
-  const redeemCode: RedeemCode = {
-    id: uid(),
-    code,
-    productName,
-    downloadLink,
-    credentials,
-    createdBy: adminEmail,
-    createdAt: new Date().toISOString(),
-    used: false,
-  };
-  
-  if (expiresIn) {
-    redeemCode.expiresAt = new Date(Date.now() + expiresIn * 24 * 60 * 60 * 1000).toISOString();
-  }
-  
-  const codes = getRedeemCodes();
-  codes.push(redeemCode);
-  setRedeemCodes(codes);
-  return redeemCode;
-}
-
-export function redeemCodeAction(code: string, userEmail: string): { 
-  success: boolean; 
-  message: string; 
-  data?: { productName: string; downloadLink: string; credentials: string; files?: DownloadFile[] } 
-} {
-  const codes = getRedeemCodes();
-  const index = codes.findIndex(c => c.code === code && !c.used);
-  
-  if (index === -1) {
-    return { success: false, message: 'INVALID OR ALREADY USED CODE' };
-  }
-  
-  const redeem = codes[index];
-  
-  if (!redeem) {
-    return { success: false, message: 'CODE NOT FOUND' };
-  }
-  
-  if (redeem.expiresAt && new Date(redeem.expiresAt) < new Date()) {
-    return { success: false, message: 'CODE HAS EXPIRED' };
-  }
-  
-  const updatedCode: RedeemCode = {
-    id: redeem.id,
-    code: redeem.code,
-    productName: redeem.productName,
-    downloadLink: redeem.downloadLink,
-    credentials: redeem.credentials,
-    createdBy: redeem.createdBy,
-    createdAt: redeem.createdAt,
-    used: true,
-    usedBy: userEmail,
-    usedAt: new Date().toISOString(),
-  };
-  
-  if (redeem.expiresAt) {
-    updatedCode.expiresAt = redeem.expiresAt;
-  }
-  
-  codes[index] = updatedCode;
-  setRedeemCodes(codes);
-  
-  const files: DownloadFile[] = [
-    {
-      id: uid(),
-      label: redeem.productName,
-      tag: 'REDEEMED',
-      url: redeem.downloadLink,
-    }
-  ];
-  
-  const purchases = getPurchases();
-  const newPurchase: Purchase = {
-    id: uid(),
-    userId: userEmail,
-    productId: `redeem-${Date.now()}`,
-    productName: redeem.productName,
-    price: 0,
-    purchaseDate: new Date().toISOString(),
-    status: 'active',
-    downloadLink: redeem.downloadLink,
-    credentials: redeem.credentials,
-    files: files,
-    isRedeem: true,
-  };
-  purchases.push(newPurchase);
-  setPurchases(purchases);
-  
-  pushNotification(
-    userEmail,
-    'REDEEM SUCCESSFUL 🎉',
-    `You successfully redeemed ${redeem.productName}. Check your downloads!`
-  );
-  
-  logActivity('purchase', userEmail, `Redeemed ${redeem.productName} via code ${code}`);
-  
-  return {
-    success: true,
-    message: 'REDEEM SUCCESSFUL',
-    data: {
-      productName: redeem.productName,
-      downloadLink: redeem.downloadLink,
-      credentials: redeem.credentials,
-      files: files,
-    }
-  };
-}
-
-// ---------------- SITE SETTINGS ----------------
-
-export interface VideoItem {
-  id: string;
-  title: string;
-  url: string;
-}
-
-export interface SiteSettings {
-  brandName: string;
-  logoEmoji: string;
-  logoImageUrl: string;
-  whatsappNumber: string;
-  discordUrl: string;
-  footerText: string;
-  footerStatus: string;
-  heroBadge: string;
-  heroTitle: string;
-  heroSubtitle: string;
-  heroPrimaryCta: string;
-  heroSecondaryCta: string;
-  heroImages: string[];
-  stats: { value: string; label: string }[];
-  featuresHeading: string;
-  features: { title: string; text: string }[];
-  secureHeading: string;
-  secureText: string;
-  videosHeading: string;
-  videosSub: string;
-  videos: VideoItem[];
-  storeHeading: string;
-  storeSub: string;
-  buyTemplate: string;
-  topUpTemplate: string;
-}
-
-export const DEFAULT_SETTINGS: SiteSettings = {
-  brandName: "SPIDER HEX",
-  logoEmoji: "🕷️",
-  logoImageUrl: "",
-  whatsappNumber: "",
-  discordUrl: "https://discord.com/app",
-  footerText: "SPIDER HEX // PREMIUM GAMING PANELS",
-  footerStatus: "ALL SYSTEMS OPERATIONAL",
-  heroBadge: "// SYSTEM ONLINE",
-  heroTitle: "SPIDER HEX",
-  heroSubtitle: "PREMIUM GAMING PANEL STORE • PC / ROOT / NON-ROOT / IOS • LIFETIME ACCESS",
-  heroPrimaryCta: "ENTER STORE",
-  heroSecondaryCta: "CREATE ACCOUNT",
-  heroImages: [],
-  stats: [
-    { value: "80K+", label: "ACTIVE PLAYERS" },
-    { value: "50K+", label: "GIFT KEYS" },
-    { value: "99.9%", label: "UPTIME" },
-  ],
-  featuresHeading: "WHY SPIDER HEX",
-  features: [
-    { title: "LIGHTNING FAST", text: "Instant delivery the moment your order is verified." },
-    { title: "ULTRA SECURE", text: "Encrypted keys, protected sessions, zero leaks." },
-    { title: "PREMIUM QUALITY", text: "Hand-tested panels updated with every patch." },
-    { title: "NEXT LEVEL", text: "Elite tooling built for serious competitors." },
-  ],
-  secureHeading: "SECURE ACCESS",
-  secureText: "Authenticate to view your licenses, wallet and downloads.",
-  videosHeading: "LATEST VIDEOS",
-  videosSub: "// STRAIGHT FROM THE CHANNEL",
-  videos: [],
-  storeHeading: "STORE",
-  storeSub: "// SELECT YOUR WEAPON",
-  buyTemplate: "Hello I'm {name} I want to buy {product} panel for pc/ios/android for lifetime for ${price} USD thank you!",
-  topUpTemplate: "Hello I'm {name} ({email}) I want to top up my {brand} wallet with ${amount} USD thank you!",
-};
-
-export const getSettings = (): SiteSettings => {
-  if (!isBrowser()) return DEFAULT_SETTINGS;
-  try {
-    const stored = localStorage.getItem(K_SETTINGS);
-    if (stored) {
-      return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
-    }
-  } catch {
-    // ignore
-  }
-  return DEFAULT_SETTINGS;
-};
-
-export const setSettings = (s: SiteSettings) => {
-  if (!isBrowser()) return;
-  localStorage.setItem(K_SETTINGS, JSON.stringify(s));
-  window.dispatchEvent(new Event('sh:update'));
-};
-
-/** Turns a YouTube watch/share/embed URL or bare ID into an embeddable URL. */
-export function youtubeEmbed(url: string): string {
-  const raw = url.trim();
-  if (!raw) return "";
-  const match =
-    raw.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([\w-]{6,})/) ??
-    raw.match(/^([\w-]{6,})$/);
-  return match ? `https://www.youtube.com/embed/${match[1]}` : raw;
-}
-
-const fill = (template: string, vars: Record<string, string>) =>
-  template.replace(/\{(\w+)\}/g, (_, k: string) => vars[k] ?? "");
-
-export const waLink = (message: string, number?: string) => {
-  const digits = (number ?? getSettings().whatsappNumber).replace(/\D/g, "");
-  const base = digits ? `https://wa.me/${digits}` : "https://wa.me/";
-  return `${base}?text=${encodeURIComponent(message)}`;
-};
-
-export async function discordCopy(message: string) {
-  try {
-    await navigator.clipboard.writeText(message);
-  } catch {
-    /* clipboard blocked */
-  }
-  window.open(getSettings().discordUrl || "https://discord.com/app", "_blank", "noopener");
-}
-
-export const buyMessage = (name: string, product: string, price: number) => {
-  const s = getSettings();
-  return fill(s.buyTemplate, { name, product, price: String(price), brand: s.brandName });
-};
-
-export const topUpMessage = (name: string, email: string, amount: number) => {
-  const s = getSettings();
-  return fill(s.topUpTemplate, { name, email, amount: String(amount), brand: s.brandName });
-};
-
-// ---------------- NOTIFICATIONS ----------------
-
 export interface AppNotification {
   id: string;
   userId: string;
@@ -435,58 +66,6 @@ export interface AppNotification {
   date: string;
   readBy: string[];
 }
-
-export const getNotifications = (): AppNotification[] => {
-  if (!isBrowser()) return [];
-  try {
-    return JSON.parse(localStorage.getItem(K_NOTIFICATIONS) || '[]');
-  } catch {
-    return [];
-  }
-};
-
-export const setNotifications = (notifications: AppNotification[]) => {
-  if (!isBrowser()) return;
-  localStorage.setItem(K_NOTIFICATIONS, JSON.stringify(notifications));
-  window.dispatchEvent(new Event('sh:update'));
-};
-
-export function pushNotification(userId: string, title: string, message: string) {
-  const item: AppNotification = {
-    id: uid(),
-    userId,
-    title,
-    message,
-    date: new Date().toISOString(),
-    readBy: [],
-  };
-  setNotifications([...getNotifications(), item]);
-  return item;
-}
-
-export const notificationsFor = (userId: string) =>
-  getNotifications()
-    .filter((n) => n.userId === userId || n.userId === "*")
-    .sort((a, b) => b.date.localeCompare(a.date));
-
-export const unreadCount = (userId: string) =>
-  notificationsFor(userId).filter((n) => !n.readBy.includes(userId)).length;
-
-export function markAllRead(userId: string) {
-  setNotifications(
-    getNotifications().map((n) =>
-      (n.userId === userId || n.userId === "*") && !n.readBy.includes(userId)
-        ? { ...n, readBy: [...n.readBy, userId] }
-        : n,
-    ),
-  );
-}
-
-export function deleteNotification(id: string) {
-  setNotifications(getNotifications().filter((n) => n.id !== id));
-}
-
-// ---------------- ACTIVITY LOG ----------------
 
 export type ActivityType =
   | "login"
@@ -508,66 +87,326 @@ export interface ActivityLog {
   date: string;
 }
 
-const MAX_ACTIVITY = 300;
+export const CATEGORIES = [
+  "ALL",
+  "PC PANEL",
+  "NON ROOT",
+  "ROOT",
+  "IOS PANEL",
+  "OTHERS ITEM",
+] as const;
 
-export const getActivity = (): ActivityLog[] => {
-  if (!isBrowser()) return [];
-  try {
-    return JSON.parse(localStorage.getItem(K_ACTIVITY) || '[]').sort((a: ActivityLog, b: ActivityLog) => 
-      b.date.localeCompare(a.date)
-    );
-  } catch {
+export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+
+/** Tell every live view to reload from the database. */
+export function notify() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("sh:update"));
+}
+
+/** All download rows for an order, falling back to the legacy single link. */
+export const purchaseFiles = (p: Purchase): DownloadFile[] => {
+  if (p.files && p.files.length > 0) return p.files;
+  if (p.downloadLink) return [{ id: "legacy", label: "MAIN DOWNLOAD", tag: "OFFICIAL", url: p.downloadLink }];
+  return [];
+};
+
+// ---------------- PRODUCTS ----------------
+
+type ProductRow = {
+  id: string;
+  name: string;
+  price: number | string;
+  price_monthly: number | string | null;
+  price_weekly: number | string | null;
+  category: string;
+  badge: string | null;
+  in_stock: boolean | null;
+  download_link: string | null;
+  image_url: string | null;
+  description: string | null;
+  video_url: string | null;
+};
+
+const toProduct = (p: ProductRow): Product => ({
+  id: p.id,
+  name: p.name,
+  price: Number(p.price ?? 0),
+  priceMonthly: p.price_monthly === null || p.price_monthly === undefined ? null : Number(p.price_monthly),
+  priceWeekly: p.price_weekly === null || p.price_weekly === undefined ? null : Number(p.price_weekly),
+  category: p.category,
+  badge: p.badge ?? "NEW",
+  inStock: p.in_stock !== false,
+  downloadLink: p.download_link ?? "",
+  imageUrl: p.image_url ?? "",
+  description: p.description ?? "",
+  videoUrl: p.video_url ?? "",
+});
+
+export async function fetchProducts(): Promise<Product[]> {
+  const { data, error } = await supabase
+    .from("products")
+    .select("*")
+    .order("created_at", { ascending: true });
+  if (error) {
+    console.error("Error loading products:", error);
     return [];
   }
+  return (data ?? []).map((p) => toProduct(p as unknown as ProductRow));
+}
+
+export async function fetchProduct(id: string): Promise<Product | null> {
+  const { data, error } = await supabase.from("products").select("*").eq("id", id).maybeSingle();
+  if (error || !data) return null;
+  return toProduct(data as unknown as ProductRow);
+}
+
+export async function saveProduct(p: Product): Promise<string | null> {
+  const payload = {
+    name: p.name.trim(),
+    price: p.price,
+    price_monthly: p.priceMonthly,
+    price_weekly: p.priceWeekly,
+    category: p.category,
+    badge: p.badge || "NEW",
+    in_stock: p.inStock,
+    download_link: p.downloadLink || "",
+    image_url: p.imageUrl || "",
+    description: p.description || "",
+    video_url: p.videoUrl || "",
+  };
+  const { error } = p.id
+    ? await supabase.from("products").update(payload).eq("id", p.id)
+    : await supabase.from("products").insert({ id: uid(), ...payload });
+  return error ? error.message : null;
+}
+
+export async function deleteProduct(id: string): Promise<string | null> {
+  const { error } = await supabase.from("products").delete().eq("id", id);
+  return error ? error.message : null;
+}
+
+// ---------------- PURCHASES ----------------
+
+type PurchaseRow = {
+  id: string;
+  user_id: string;
+  product_id: string | null;
+  product_name: string;
+  plan: string | null;
+  price: number | string;
+  status: string;
+  download_link: string | null;
+  files: unknown;
+  credentials: string | null;
+  is_redeem: boolean | null;
+  purchase_date: string;
 };
 
-export const setActivity = (logs: ActivityLog[]) => {
-  if (!isBrowser()) return;
-  localStorage.setItem(K_ACTIVITY, JSON.stringify(logs));
-  window.dispatchEvent(new Event('sh:update'));
-};
+const toPurchase = (r: PurchaseRow): Purchase => ({
+  id: r.id,
+  userId: r.user_id,
+  productId: r.product_id ?? "",
+  productName: r.product_name,
+  plan: r.plan ?? "LIFETIME",
+  price: Number(r.price ?? 0),
+  purchaseDate: r.purchase_date,
+  status: (r.status as Purchase["status"]) ?? "pending",
+  downloadLink: r.download_link ?? "",
+  files: Array.isArray(r.files) ? (r.files as DownloadFile[]) : [],
+  credentials: r.credentials ?? "",
+  isRedeem: r.is_redeem === true,
+});
 
-export function logActivity(type: ActivityType, actor: string, message: string) {
-  const logs = getActivity();
-  logs.push({
-    id: uid(),
-    type,
-    actor,
-    message,
-    date: new Date().toISOString(),
+/** RLS returns the caller's own orders, or every order for admins. */
+export async function fetchPurchases(): Promise<Purchase[]> {
+  const { data, error } = await supabase
+    .from("purchases")
+    .select("*")
+    .order("purchase_date", { ascending: false });
+  if (error) {
+    console.error("Error loading purchases:", error);
+    return [];
+  }
+  return (data ?? []).map((r) => toPurchase(r as unknown as PurchaseRow));
+}
+
+export async function createPurchase(input: {
+  userId: string;
+  productId: string;
+  productName: string;
+  plan?: string;
+  price: number;
+  status?: Purchase["status"];
+  downloadLink?: string;
+  files?: DownloadFile[];
+  credentials?: string;
+  isRedeem?: boolean;
+}): Promise<string | null> {
+  const { error } = await supabase.from("purchases").insert({
+    user_id: input.userId,
+    product_id: input.productId || null,
+    product_name: input.productName,
+    plan: input.plan ?? "LIFETIME",
+    price: input.price,
+    status: input.status ?? "pending",
+    download_link: input.downloadLink ?? "",
+    files: (input.files ?? []) as never,
+    credentials: input.credentials ?? "",
+    is_redeem: input.isRedeem ?? false,
   });
-  setActivity(logs.slice(0, MAX_ACTIVITY));
+  if (error) console.error("Error creating purchase:", error);
+  notify();
+  return error ? error.message : null;
 }
 
-export const clearActivity = () => setActivity([]);
-
-/** Notify every member (broadcast) and record it in the activity log. */
-export function broadcastNotification(title: string, message: string, actor = "SYSTEM") {
-  pushNotification("*", title, message);
-  logActivity("notification", actor, `Broadcast: ${title}`);
+export async function updatePurchase(
+  id: string,
+  patch: { status?: Purchase["status"]; files?: DownloadFile[]; downloadLink?: string },
+): Promise<string | null> {
+  const payload: Record<string, unknown> = {};
+  if (patch.status) payload["status"] = patch.status;
+  if (patch.files) payload["files"] = patch.files;
+  if (patch.downloadLink !== undefined) payload["download_link"] = patch.downloadLink;
+  const { error } = await supabase.from("purchases").update(payload).eq("id", id);
+  if (error) console.error("Error updating purchase:", error);
+  notify();
+  return error ? error.message : null;
 }
 
-// ---------------- USER FUNCTIONS ----------------
+// ---------------- NOTIFICATIONS ----------------
+
+export async function fetchNotifications(): Promise<AppNotification[]> {
+  const { data, error } = await supabase
+    .from("notifications")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) {
+    console.error("Error loading notifications:", error);
+    return [];
+  }
+  return (data ?? []).map((n) => ({
+    id: n.id as string,
+    userId: n.user_id as string,
+    title: (n.title as string) ?? "",
+    message: (n.message as string) ?? "",
+    date: n.created_at as string,
+    readBy: ((n.read_by as string[]) ?? []) as string[],
+  }));
+}
+
+export async function pushNotification(userId: string, title: string, message: string) {
+  const { error } = await supabase.from("notifications").insert({ user_id: userId, title, message });
+  if (error) console.error("Error sending notification:", error);
+  notify();
+}
+
+export async function markAllRead(userId: string) {
+  const items = await fetchNotifications();
+  const pending = items.filter(
+    (n) => (n.userId === userId || n.userId === "*") && !n.readBy.includes(userId),
+  );
+  await Promise.all(
+    pending.map((n) =>
+      supabase
+        .from("notifications")
+        .update({ read_by: [...n.readBy, userId] })
+        .eq("id", n.id),
+    ),
+  );
+}
+
+export async function deleteNotification(id: string) {
+  const { error } = await supabase.from("notifications").delete().eq("id", id);
+  if (error) console.error("Error deleting notification:", error);
+  notify();
+}
+
+export async function broadcastNotification(title: string, message: string, actor = "SYSTEM") {
+  await pushNotification("*", title, message);
+  await logActivity("notification", actor, `Broadcast: ${title}`);
+}
+
+// ---------------- ACTIVITY LOG ----------------
+
+export async function fetchActivity(): Promise<ActivityLog[]> {
+  const { data, error } = await supabase
+    .from("activity_log")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(300);
+  if (error) {
+    console.error("Error loading activity:", error);
+    return [];
+  }
+  return (data ?? []).map((l) => ({
+    id: l.id as string,
+    type: (l.type as ActivityType) ?? "user",
+    actor: (l.actor as string) ?? "",
+    message: (l.message as string) ?? "",
+    date: l.created_at as string,
+  }));
+}
+
+export async function logActivity(type: ActivityType, actor: string, message: string) {
+  const { error } = await supabase.from("activity_log").insert({ type, actor, message });
+  if (error) console.error("Error logging activity:", error);
+}
+
+export async function clearActivity() {
+  const { error } = await supabase.from("activity_log").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+  if (error) console.error("Error clearing activity:", error);
+  notify();
+}
+
+// ---------------- MESSAGING HELPERS ----------------
+
+/** Turns a YouTube watch/share/embed URL or bare ID into an embeddable URL. */
+export function youtubeEmbed(url: string): string {
+  const raw = url.trim();
+  if (!raw) return "";
+  const match =
+    raw.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([\w-]{6,})/) ??
+    raw.match(/^([\w-]{6,})$/);
+  return match ? `https://www.youtube.com/embed/${match[1]}` : raw;
+}
+
+const fill = (template: string, vars: Record<string, string>) =>
+  template.replace(/\{(\w+)\}/g, (_, k: string) => vars[k] ?? "");
+
+export const waLink = (message: string, number?: string) => {
+  const digits = (number ?? cachedSettings().whatsappNumber).replace(/\D/g, "");
+  const base = digits ? `https://wa.me/${digits}` : "https://wa.me/";
+  return `${base}?text=${encodeURIComponent(message)}`;
+};
+
+export async function discordCopy(message: string) {
+  try {
+    await navigator.clipboard.writeText(message);
+  } catch {
+    /* clipboard blocked */
+  }
+  window.open(cachedSettings().discordUrl || "https://discord.com/app", "_blank", "noopener");
+}
+
+export const buyMessage = (name: string, product: string, price: number, plan?: string) => {
+  const s = cachedSettings();
+  const base = fill(s.buyTemplate, { name, product, price: String(price), brand: s.brandName });
+  return plan ? `${base}\nPlan: ${plan}` : base;
+};
+
+export const topUpMessage = (name: string, email: string, amount: number) => {
+  const s = cachedSettings();
+  return fill(s.topUpTemplate, { name, email, amount: String(amount), brand: s.brandName });
+};
+
+// ---------------- USER HELPERS ----------------
 
 export async function getUserById(userId: string): Promise<{ email: string; fullName: string } | null> {
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('email, full_name')
-      .eq('id', userId)
-      .single();
-    
-    if (error || !data) {
-      console.error('Error fetching user:', error);
-      return null;
-    }
-    
-    return {
-      email: data.email || 'Unknown',
-      fullName: data.full_name || 'Unknown User',
-    };
-  } catch (error) {
-    console.error('Error fetching user:', error);
-    return null;
-  }
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("email, full_name")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error || !data) return null;
+  return { email: data.email, fullName: data.full_name ?? data.email };
 }
