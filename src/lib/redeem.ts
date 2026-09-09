@@ -97,6 +97,8 @@ export async function createCode(data: {
       insertData.product_id = data.productId;
     }
 
+    console.log('Inserting redeem code:', insertData);
+
     const { error } = await supabase
       .from('redeem_codes')
       .insert(insertData);
@@ -136,7 +138,9 @@ export async function redeemCodeAction(code: string, userId: string): Promise<{
   } 
 }> {
   try {
-    // First, get the code
+    console.log('🔍 Looking for code:', code);
+    
+    // ✅ FIX: Don't filter by claimed_by - just get the code
     const { data: codes, error: fetchError } = await supabase
       .from('redeem_codes')
       .select('*')
@@ -147,32 +151,31 @@ export async function redeemCodeAction(code: string, userId: string): Promise<{
       return { success: false, message: 'DATABASE ERROR' };
     }
     
+    console.log('📦 Codes found:', codes?.length || 0);
+    
     if (!codes || codes.length === 0) {
+      console.log('❌ Code not found:', code);
       return { success: false, message: 'INVALID CODE' };
     }
     
     const redeem = codes[0];
-    
-    // ✅ Check if redeem exists (add null check)
-    if (!redeem) {
-      return { success: false, message: 'CODE NOT FOUND' };
-    }
-    
-    // Safely access properties with defaults
-    const currentUsage = redeem.usage_count ?? 0;
-    const maxUsage = redeem.usage_limit ?? 1;
+    console.log('✅ Code found:', redeem);
     
     // Check if code is already fully used
+    const currentUsage = redeem.usage_count || 0;
+    const maxUsage = redeem.usage_limit || 1;
+    
+    // If maxUsage is 1 and currentUsage >= 1, code is already used
     if (maxUsage === 1 && currentUsage >= 1) {
       return { success: false, message: 'THIS CODE HAS ALREADY BEEN USED' };
     }
     
-    // Check if code has reached its limit
+    // If maxUsage > 1, check if it's reached its limit
     if (maxUsage !== -1 && currentUsage >= maxUsage) {
       return { success: false, message: 'CODE HAS REACHED MAXIMUM USES' };
     }
     
-    // Check if this specific user already used this specific code
+    // ✅ Check if this specific user already used this specific code
     if (redeem.claimed_by === userId) {
       return { success: false, message: 'YOU ALREADY USED THIS CODE' };
     }
@@ -200,9 +203,9 @@ export async function redeemCodeAction(code: string, userId: string): Promise<{
     let files: DownloadFile[] = [];
     if (redeem.files) {
       try {
-        const parsed = JSON.parse(redeem.files);
-        if (Array.isArray(parsed)) {
-          files = parsed;
+        files = JSON.parse(redeem.files);
+        if (!Array.isArray(files)) {
+          files = [];
         }
       } catch {
         files = [];
@@ -232,5 +235,27 @@ export async function redeemCodeAction(code: string, userId: string): Promise<{
   } catch (err: any) {
     console.error('Error in redeemCodeAction:', err);
     return { success: false, message: err.message || 'REDEEM FAILED' };
+  }
+}
+
+export async function getUserById(userId: string): Promise<{ email: string; fullName: string } | null> {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('email, full_name')
+      .eq('id', userId)
+      .single();
+    
+    if (error || !data) {
+      return null;
+    }
+    
+    return {
+      email: data.email || 'Unknown',
+      fullName: data.full_name || 'Unknown User',
+    };
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    return null;
   }
 }
