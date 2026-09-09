@@ -4,18 +4,15 @@ import { toast } from "sonner";
 import { Page } from "@/components/shell";
 import { useAuth } from "@/lib/auth";
 import { useSettings } from "@/lib/use-settings";
-import { fetchProduct } from "@/lib/spiderhex";
+import { fetchProduct, createPurchase } from "@/lib/spiderhex";
 import {
   buyMessage,
   discordCopy,
   waLink,
   pushNotification,
   logActivity,
-  getPurchases,
-  setPurchases,
   uid,
   type Product,
-  type Purchase,
 } from "@/lib/spiderhex";
 
 export const Route = createFileRoute("/product/$id")({
@@ -60,11 +57,11 @@ function ProductPage() {
   }, [id, navigate]);
 
   const getPlanPrice = (plan: 'lifetime' | 'monthly' | 'weekly') => {
-  if (!product) return 0;
-  if (plan === 'lifetime') return product.price || 0;        // ✅ This is correct - uses price
-  if (plan === 'monthly') return product.priceMonthly || 0;  // ✅ This is correct
-  return product.priceWeekly || 0;                            // ✅ This is correct
-};
+    if (!product) return 0;
+    if (plan === 'lifetime') return product.price || 0;
+    if (plan === 'monthly') return product.priceMonthly || 0;
+    return product.priceWeekly || 0;
+  };
 
   const getPlanLabel = (plan: 'lifetime' | 'monthly' | 'weekly') => {
     if (plan === 'lifetime') return 'LIFETIME PASS';
@@ -72,7 +69,8 @@ function ProductPage() {
     return '7 DAY ACCESS';
   };
 
-  const handleBuy = (plan: 'lifetime' | 'monthly' | 'weekly', channel: 'whatsapp' | 'discord') => {
+  // ✅ FIX: Save purchase to DATABASE
+  const handleBuy = async (plan: 'lifetime' | 'monthly' | 'weekly', channel: 'whatsapp' | 'discord') => {
     if (!user) {
       toast.error("PLEASE LOGIN FIRST");
       navigate({ to: '/login' });
@@ -89,14 +87,13 @@ function ProductPage() {
       return;
     }
 
-    const purchase: Purchase = {
-      id: uid(),
+    // ✅ Create purchase in DATABASE
+    const error = await createPurchase({
       userId: user.id,
       productId: product.id,
       productName: `${product.name} (${planLabel})`,
       plan: planLabel,
       price: price,
-      purchaseDate: new Date().toISOString(),
       status: 'pending',
       downloadLink: product.downloadLink || "",
       files: product.downloadLink ? [
@@ -109,9 +106,13 @@ function ProductPage() {
       ] : [],
       isRedeem: false,
       credentials: plan,
-    };
+    });
 
-    setPurchases([...getPurchases(), purchase]);
+    if (error) {
+      console.error('Error creating purchase:', error);
+      toast.error('Failed to place order. Please try again.');
+      return;
+    }
 
     pushNotification(
       user.id,
@@ -121,6 +122,7 @@ function ProductPage() {
 
     logActivity("purchase", user.email, `Ordered ${product.name} (${planLabel}) for $${price} (PENDING)`);
 
+    // Send WhatsApp/Discord message
     const whatsappNumber = settings?.whatsappNumber || '+923001234567';
     const discordLink = settings?.discordUrl || 'https://discord.com/app';
 
@@ -163,7 +165,7 @@ function ProductPage() {
   const pp = settings?.productPage || {
     heading: "CHOOSE YOUR PLAN",
     supportText: "Contact our support team for assistance with setup, custom configurations, or any questions.",
-    discordLabel: "DISCORD SUPPORT",
+    discordLabel: "💬 DISCORD SUPPORT",
     telegramLabel: "📱 TELEGRAM SUPPORT",
     dummyImage: "https://images.unsplash.com/photo-1611162616475-46b635cb6868?w=800&h=400&fit=crop",
     dummyVideo: "https://www.youtube.com/embed/dQw4w9WgXcQ",
@@ -175,7 +177,6 @@ function ProductPage() {
   const productImage = product.imageUrl || pp.dummyImage;
   const productVideo = product.videoUrl || pp.dummyVideo;
 
-  // Extract YouTube embed URL
   const youtubeEmbedUrl = productVideo
     ? productVideo.includes('youtube.com') || productVideo.includes('youtu.be')
       ? `https://www.youtube.com/embed/${productVideo.split('v=')[1]?.split('&')[0] || productVideo.split('/').pop()}`
@@ -208,7 +209,7 @@ function ProductPage() {
                 }}
               />
             </div>
-            {/* ✅ Demo Video - Always show if videoUrl exists */}
+            {/* Demo Video */}
             {product.videoUrl ? (
               <div className="panel overflow-hidden">
                 <div className="aspect-video w-full bg-black">
@@ -297,14 +298,14 @@ function ProductPage() {
                   className="rounded bg-[#ff0044] px-2 py-2 text-[10px] font-bold text-white hover:bg-[#cc0033] transition flex items-center justify-center gap-1"
                   disabled={getPlanPrice('lifetime') <= 0}
                 >
-                  WHATSAPP
+                  📱 WHATSAPP
                 </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); handleBuy('lifetime', 'discord'); }}
                   className="rounded bg-[#ff0044] px-2 py-2 text-[10px] font-bold text-white hover:bg-[#cc0033] transition flex items-center justify-center gap-1"
                   disabled={getPlanPrice('lifetime') <= 0}
                 >
-                  DISCORD
+                  💬 DISCORD
                 </button>
               </div>
             </div>
@@ -328,14 +329,14 @@ function ProductPage() {
                   className="rounded bg-[#ff0044] px-2 py-2 text-[10px] font-bold text-white hover:bg-[#cc0033] transition flex items-center justify-center gap-1"
                   disabled={getPlanPrice('monthly') <= 0}
                 >
-                  WHATSAPP
+                  📱 WHATSAPP
                 </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); handleBuy('monthly', 'discord'); }}
                   className="rounded bg-[#ff0044] px-2 py-2 text-[10px] font-bold text-white hover:bg-[#cc0033] transition flex items-center justify-center gap-1"
                   disabled={getPlanPrice('monthly') <= 0}
                 >
-                  DISCORD
+                  💬 DISCORD
                 </button>
               </div>
             </div>

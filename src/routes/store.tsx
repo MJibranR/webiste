@@ -8,14 +8,11 @@ import { fetchProducts, fetchCategories, type Category, createPurchase } from "@
 import {
   buyMessage,
   discordCopy,
-  getPurchases,
-  setPurchases,
   uid,
   waLink,
   pushNotification,
   logActivity,
   type Product,
-  type Purchase,
 } from "@/lib/spiderhex";
 
 export const Route = createFileRoute("/store")({
@@ -79,71 +76,64 @@ function StorePage() {
     ? products 
     : products.filter((p) => p.category === selectedCategory);
 
-  // ✅ FIX: Save purchase to DATABASE
-  const record = async (product: Product): Promise<Purchase | null> => {
-    if (!user) return null;
-    
-    const purchaseData = {
-      userId: user.id,
-      productId: product.id,
-      productName: product.name,
-      plan: "LIFETIME",
-      price: product.price,
-      status: 'pending' as const,
-      downloadLink: product.downloadLink || "",
-      files: product.downloadLink ? [
-        {
-          id: uid(),
-          label: product.name,
-          tag: 'PENDING',
-          url: product.downloadLink,
-        }
-      ] : [],
-      isRedeem: false,
-    };
-    
-    // Save to database
-    const error = await createPurchase(purchaseData);
-    if (error) {
-      console.error('Error saving purchase:', error);
-      toast.error('Failed to place order');
-      return null;
-    }
-    
-    // Also save to localStorage for backup
-    const localPurchase: Purchase = {
-      id: uid(),
-      ...purchaseData,
-      purchaseDate: new Date().toISOString(),
-    };
-    setPurchases([...getPurchases(), localPurchase]);
-    
-    pushNotification(
-      user.id,
-      "ORDER PLACED 🛒",
-      `Your order for ${product.name} ($${product.price}) is pending admin approval.`,
-    );
-    
-    logActivity("purchase", user.email, `Ordered ${product.name} for $${product.price} (PENDING)`);
-    return localPurchase;
-  };
-
-  const buy = async (product: Product, channel: "whatsapp" | "discord") => {
+  // ✅ Handle buy - saves to DATABASE
+  const handleBuy = async (product: Product, channel: "whatsapp" | "discord") => {
     if (!user) {
       toast.error("LOGIN REQUIRED");
       navigate({ to: "/login" });
       return;
     }
     
-    await record(product);
-    const msg = buyMessage(user.fullName, product.name, product.price);
-    
-    if (channel === "whatsapp") {
-      window.open(waLink(msg), "_blank", "noopener");
-      toast.success("✅ ORDER PLACED! Complete payment on WhatsApp to activate your download.");
-    } else {
-      void discordCopy(msg);
-      toast.success("✅ ORDER PLACED! Message copied. Send to admin on Discord.");
+    try {
+      // Save to database
+      const error = await createPurchase({
+        userId: user.id,
+        productId: product.id,
+        productName: product.name,
+        plan: "LIFETIME",
+        price: product.price,
+        status: 'pending',
+        downloadLink: product.downloadLink || "",
+        files: product.downloadLink ? [
+          {
+            id: uid(),
+            label: product.name,
+            tag: 'PENDING',
+            url: product.downloadLink,
+          }
+        ] : [],
+        isRedeem: false,
+      });
+
+      if (error) {
+        console.error('Error creating purchase:', error);
+        toast.error('Failed to place order');
+        return;
+      }
+
+      pushNotification(
+        user.id,
+        "ORDER PLACED 🛒",
+        `Your order for ${product.name} ($${product.price}) is pending admin approval.`,
+      );
+      
+      logActivity("purchase", user.email, `Ordered ${product.name} for $${product.price} (PENDING)`);
+      
+      toast.success("✅ ORDER PLACED!");
+      
+      // Send WhatsApp/Discord message
+      const msg = buyMessage(user.fullName, product.name, product.price);
+      
+      if (channel === "whatsapp") {
+        window.open(waLink(msg), "_blank", "noopener");
+        toast.success("✅ ORDER PLACED! Complete payment on WhatsApp to activate your download.");
+      } else {
+        void discordCopy(msg);
+        toast.success("✅ ORDER PLACED! Message copied. Send to admin on Discord.");
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Failed to place order');
     }
   };
 
