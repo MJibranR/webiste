@@ -6,6 +6,8 @@ import { SectionTitle } from "@/components/shell";
 import { useAuth } from "@/lib/auth";
 import { redeemCodeAction } from "@/lib/redeem";
 import { supabase } from "@/integrations/supabase/client";
+import { DownloadModal } from "@/components/download-modal";
+import type { Purchase } from "@/lib/spiderhex";
 
 export const Route = createFileRoute("/dashboard/redeem")({
   component: () => (
@@ -27,6 +29,7 @@ function RedeemPage() {
   const [loading, setLoading] = useState(false);
   const [redeemed, setRedeemed] = useState<any[]>([]);
   const [loadingRedeemed, setLoadingRedeemed] = useState(false);
+  const [redeemPopup, setRedeemPopup] = useState<Purchase | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -72,7 +75,25 @@ function RedeemPage() {
       const result = await redeemCodeAction(code.trim().toUpperCase(), user.id);
       console.log('Redeem result:', result);
       
-      if (result.success) {
+      if (result.success && result.data) {
+        // ✅ Create a purchase-like object for the popup
+        const purchase: Purchase = {
+          id: `redeem-${Date.now()}`,
+          userId: user.id,
+          productId: 'redeem',
+          productName: result.data.productName || 'Redeemed Panel',
+          plan: 'REDEEM',
+          price: 0,
+          purchaseDate: new Date().toISOString(),
+          status: 'active',
+          downloadLink: result.data.downloadLink || '',
+          files: result.data.files || [],
+          isRedeem: true,
+          credentials: result.data.accessKey || '',
+        };
+        
+        // ✅ Show the popup
+        setRedeemPopup(purchase);
         toast.success(result.message);
         setCode("");
         loadRedeemed();
@@ -101,6 +122,9 @@ function RedeemPage() {
 
   return (
     <>
+      {/* ✅ Redeem Popup */}
+      <DownloadModal purchase={redeemPopup} onClose={() => setRedeemPopup(null)} />
+
       <SectionTitle sub="// REDEEM YOUR PANEL ACCESS">REDEEM CODE</SectionTitle>
 
       <div className="panel p-6">

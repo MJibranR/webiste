@@ -1,4 +1,4 @@
-import { Copy, ExternalLink, Key } from "lucide-react";
+import { Copy, ExternalLink, Key, File, Download, CheckCircle, Clock, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Modal } from "./modal";
 import { purchaseFiles, type Purchase } from "@/lib/spiderhex";
@@ -25,14 +25,32 @@ export function DownloadModal({
 
   const discordUrl = settings?.discordUrl || "https://discord.com/app";
 
+  const getStatusIcon = () => {
+    if (purchase?.status === 'pending') return <Clock className="h-4 w-4 text-gold" />;
+    if (purchase?.status === 'active') return <CheckCircle className="h-4 w-4 text-primary" />;
+    return <XCircle className="h-4 w-4 text-danger" />;
+  };
+
+  const getStatusText = () => {
+    if (purchase?.status === 'pending') return '⏳ Waiting for admin approval';
+    if (purchase?.status === 'active') return '✅ License Active';
+    return '⛔ License Expired';
+  };
+
+  const getStatusColor = () => {
+    if (purchase?.status === 'pending') return 'border-gold/30 bg-gold/5 text-gold';
+    if (purchase?.status === 'active') return 'border-primary/30 bg-primary/5 text-primary';
+    return 'border-danger/30 bg-danger/5 text-danger';
+  };
+
   return (
     <Modal
       open={!!purchase}
       onClose={onClose}
-      sub={`${purchase?.productName ?? ""} • ${purchase?.isRedeem ? 'REDEEMED' : 'PURCHASED'}`}
+      sub={`${purchase?.productName ?? ""} • ${purchase?.isRedeem ? '🎁 REDEEMED' : '🛒 PURCHASED'}`}
       title={purchase?.productName ?? ""}
       footer={
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-border bg-accent/40 p-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-accent/30 p-4">
           <div>
             <p className="text-[11px] font-bold text-primary">💬 NEED HELP?</p>
             <p className="text-[10px] text-muted-foreground">
@@ -43,29 +61,35 @@ export function DownloadModal({
             href={discordUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded bg-primary px-3 py-2 text-[10px] font-bold text-primary-foreground hover:opacity-90"
+            className="rounded-lg bg-primary px-4 py-2 text-[10px] font-bold text-primary-foreground hover:opacity-90 transition flex items-center gap-2"
           >
-            JOIN DISCORD
+            <span>🎮</span> JOIN DISCORD
           </a>
         </div>
       }
     >
-      <p className="text-center text-[11px] text-muted-foreground">
-        {files.length > 0 ? 'Official and verified download links' : 'No links available yet'}
+      {/* Status Badge */}
+      <div className={`flex items-center justify-center gap-2 rounded-full border px-4 py-1.5 text-[10px] font-medium w-fit mx-auto ${getStatusColor()}`}>
+        {getStatusIcon()}
+        {getStatusText()}
+      </div>
+
+      <p className="text-center text-[11px] text-muted-foreground mt-3">
+        {files.length > 0 ? '📥 Official and verified download links' : 'No links available yet'}
       </p>
 
       {/* ACCESS KEY */}
       {purchase?.credentials && purchase.credentials.trim() !== '' ? (
-        <div className="mt-4 p-4 rounded-lg border border-gold/30 bg-gold/5">
+        <div className="mt-4 p-4 rounded-xl border border-gold/30 bg-gold/5">
           <div className="flex items-center gap-2 mb-2">
             <Key className="h-4 w-4 text-gold" />
-            <span className="text-[10px] tracking-[0.2em] text-muted-foreground">🔑 ACCESS KEY / CREDENTIALS</span>
+            <span className="text-[10px] tracking-[0.2em] text-muted-foreground uppercase font-bold">Access Key / Credentials</span>
           </div>
-          <div className="flex items-center justify-between gap-3 bg-background/60 rounded-md p-3 border border-gold/20">
-            <code className="text-xs font-mono text-gold break-all">{purchase.credentials}</code>
+          <div className="flex items-center justify-between gap-3 bg-background/60 rounded-lg p-3 border border-gold/20">
+            <code className="text-xs font-mono text-gold break-all font-bold">{purchase.credentials}</code>
             <button
               onClick={() => copy(purchase.credentials!)}
-              className="flex-shrink-0 rounded border border-gold/30 px-3 py-1.5 text-[10px] text-gold hover:bg-gold/10 transition flex items-center gap-1"
+              className="flex-shrink-0 rounded-lg border border-gold/30 px-3 py-1.5 text-[10px] text-gold hover:bg-gold/10 hover:border-gold/60 transition flex items-center gap-1.5 font-medium"
             >
               <Copy className="h-3.5 w-3.5" /> COPY
             </button>
@@ -75,34 +99,41 @@ export function DownloadModal({
 
       {/* Download Links */}
       {files.length === 0 ? (
-        <p className="mt-5 rounded border border-border p-6 text-center text-xs text-muted-foreground">
-          {purchase?.status === 'pending' 
-            ? '⏳ Order pending admin approval. Check back later.' 
-            : 'NO LINKS ADDED YET'}
-        </p>
+        <div className="mt-5 rounded-xl border border-border bg-background/30 p-8 text-center">
+          <File className="h-8 w-8 text-muted-foreground mx-auto mb-2 opacity-50" />
+          <p className="text-xs text-muted-foreground">
+            {purchase?.status === 'pending' 
+              ? '⏳ Order pending admin approval. Check back later.' 
+              : '📎 No download links added yet'}
+          </p>
+        </div>
       ) : (
-        <div className="mt-5 max-h-[45vh] space-y-3 overflow-y-auto pr-1">
+        <div className="mt-5 max-h-[45vh] space-y-3 overflow-y-auto pr-1 custom-scroll">
           {files.map((f, index) => (
             <div
               key={f.id}
-              className="rounded-lg border border-border bg-background/40 p-4 transition hover:border-primary/30"
+              className="group rounded-xl border border-border bg-background/40 p-4 transition-all hover:border-primary/30 hover:bg-background/60 hover:shadow-lg hover:shadow-primary/5"
             >
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-muted-foreground tracking-[0.15em]">FILE {index + 1}</span>
+                  <span className="text-[10px] text-muted-foreground tracking-[0.15em] font-mono bg-accent/30 px-2 py-0.5 rounded-full">
+                    #{index + 1}
+                  </span>
                   {f.tag && (
-                    <span className="rounded-full border border-primary/40 px-2 py-0.5 text-[9px] text-primary">
+                    <span className="rounded-full border border-primary/40 px-2.5 py-0.5 text-[9px] text-primary uppercase font-bold tracking-wider">
                       {f.tag}
                     </span>
                   )}
                 </div>
               </div>
-              <p className="text-sm font-bold text-primary">{f.label || 'Download'}</p>
-              <p className="mt-1 truncate text-[10px] text-muted-foreground font-mono">{f.url}</p>
+              <p className="text-sm font-bold text-primary group-hover:glow-text transition">{f.label || 'Download'}</p>
+              <p className="mt-1 truncate text-[10px] text-muted-foreground font-mono bg-accent/20 px-2 py-1 rounded-md">
+                {f.url}
+              </p>
               <div className="mt-3 flex items-center gap-2">
                 <button
                   onClick={() => void copy(f.url)}
-                  className="rounded border border-border px-3 py-1.5 text-[10px] text-muted-foreground hover:text-primary hover:border-primary transition flex items-center gap-1"
+                  className="rounded-lg border border-border px-3 py-1.5 text-[10px] text-muted-foreground hover:text-primary hover:border-primary transition flex items-center gap-1.5 font-medium bg-background/50"
                 >
                   <Copy className="h-3.5 w-3.5" /> COPY LINK
                 </button>
@@ -110,7 +141,7 @@ export function DownloadModal({
                   href={f.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="rounded border border-primary/50 px-3 py-1.5 text-[10px] text-primary hover:bg-accent transition flex items-center gap-1"
+                  className="rounded-lg bg-primary px-4 py-1.5 text-[10px] font-bold text-primary-foreground hover:opacity-90 transition flex items-center gap-1.5 shadow-lg shadow-primary/20"
                 >
                   <ExternalLink className="h-3.5 w-3.5" /> OPEN
                 </a>
@@ -119,17 +150,6 @@ export function DownloadModal({
           ))}
         </div>
       )}
-
-      {/* Status */}
-      <div className="mt-4 pt-4 border-t border-border/60">
-        <p className="text-[10px] text-center text-muted-foreground">
-          {purchase?.status === 'pending' 
-            ? '⏳ Waiting for admin approval' 
-            : purchase?.status === 'active' 
-            ? '✅ License Active' 
-            : '⛔ License Expired'}
-        </p>
-      </div>
     </Modal>
   );
 }

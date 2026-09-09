@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { Download, Store, Wallet } from "lucide-react";
+import { Clock, Download, Store, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { SectionTitle } from "@/components/shell";
@@ -213,17 +213,21 @@ function DashboardInner() {
                       {p.status.toUpperCase()}
                     </span>
                     {hasLinks && p.status === "active" ? (
-                      <button
-                        onClick={() => setOpenModal(p)}
-                        className="pulse-glow rounded bg-primary px-3 py-2 text-[11px] font-bold text-primary-foreground hover:opacity-90"
-                      >
-                        DOWNLOAD TOOL
-                      </button>
-                    ) : p.status === "pending" ? (
-                      <span className="text-[10px] text-gold">⏳ WAITING FOR ADMIN</span>
-                    ) : (
-                      <span className="text-[10px] text-muted-foreground">⏳ LINK PENDING</span>
-                    )}
+                    <button
+                      onClick={() => setOpenModal(p)}
+                      className="pulse-glow rounded-lg bg-primary px-4 py-2 text-[11px] font-bold text-primary-foreground hover:opacity-90 transition flex items-center gap-2 shadow-lg shadow-primary/20"
+                    >
+                      <Download className="h-4 w-4" /> DOWNLOAD TOOL
+                    </button>
+                  ) : p.status === "pending" ? (
+                    <span className="text-[10px] text-gold flex items-center gap-1.5 bg-gold/5 px-3 py-1.5 rounded-full border border-gold/20">
+                      <Clock className="h-3.5 w-3.5" /> WAITING FOR ADMIN
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-muted-foreground flex items-center gap-1.5 bg-background/30 px-3 py-1.5 rounded-full border border-border">
+                      <Clock className="h-3.5 w-3.5" /> LINK PENDING
+                    </span>
+                  )}
                   </div>
                 </div>
               );

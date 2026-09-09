@@ -9,7 +9,6 @@ import { useLive } from "@/lib/use-live";
 import { logActivity, getUserById } from "@/lib/spiderhex";
 import { createCode, deleteCode, generateCode, listAllCodes, type RedeemCode, type DownloadFile } from "@/lib/redeem";
 
-// ✅ Fixed route name
 export const Route = createFileRoute("/admin/redeem")({
   component: () => (
     <AdminShell>
@@ -34,7 +33,6 @@ function RedeemAdmin() {
   const [code, setCode] = useState(generateCode());
   const [productId, setProductId] = useState("");
   const [productName, setProductName] = useState("");
-  const [downloadLink, setDownloadLink] = useState("");
   const [accessKey, setAccessKey] = useState("");
   const [note, setNote] = useState("");
   const [usageLimit, setUsageLimit] = useState(1);
@@ -54,7 +52,6 @@ function RedeemAdmin() {
     const p = products.find((x) => x.id === id);
     if (p) {
       setProductName(p.name);
-      if (p.downloadLink) setDownloadLink(p.downloadLink);
     }
   };
 
@@ -62,7 +59,6 @@ function RedeemAdmin() {
     setCode(generateCode());
     setProductId("");
     setProductName("");
-    setDownloadLink("");
     setAccessKey("");
     setNote("");
     setUsageLimit(1);
@@ -86,8 +82,14 @@ function RedeemAdmin() {
       toast.error("CODE AND PANEL NAME ARE REQUIRED");
       return;
     }
-    if (!downloadLink.trim() && files.length === 0) {
-      toast.error("ADD A DOWNLOAD LINK OR FILES");
+    if (files.length === 0) {
+      toast.error("ADD AT LEAST ONE DOWNLOAD LINK");
+      return;
+    }
+    // Check if any file has a URL
+    const hasUrl = files.some(f => f.url.trim() !== '');
+    if (!hasUrl) {
+      toast.error("ADD AT LEAST ONE VALID DOWNLOAD LINK");
       return;
     }
     setBusy(true);
@@ -95,7 +97,7 @@ function RedeemAdmin() {
       code, 
       productId: productId || null, 
       productName, 
-      downloadLink, 
+      downloadLink: "", // No single link anymore
       accessKey, 
       note,
       usageLimit,
@@ -298,16 +300,6 @@ function RedeemAdmin() {
             >
               <Plus className="h-3.5 w-3.5" /> ADD LINK
             </button>
-          </div>
-
-          <div>
-            <label className="block text-[10px] text-muted-foreground mb-1">SINGLE DOWNLOAD LINK (FALLBACK)</label>
-            <input
-              className={input}
-              placeholder="https://example.com/download.zip"
-              value={downloadLink}
-              onChange={(e) => setDownloadLink(e.target.value)}
-            />
           </div>
 
           <div>
