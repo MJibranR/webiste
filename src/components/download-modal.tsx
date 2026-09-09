@@ -1,4 +1,4 @@
-import { Copy, Download, Key } from "lucide-react";
+import { Copy, ExternalLink, Key } from "lucide-react";
 import { toast } from "sonner";
 import { Modal } from "./modal";
 import { purchaseFiles, type Purchase } from "@/lib/spiderhex";
@@ -54,26 +54,26 @@ export function DownloadModal({
         {files.length > 0 ? 'Official and verified download links' : 'No links available yet'}
       </p>
 
-      {/* ✅ ACCESS KEY - Properly styled with theme */}
-      {purchase?.credentials && (
+      {/* ACCESS KEY */}
+      {purchase?.credentials && purchase.credentials.trim() !== '' ? (
         <div className="mt-4 p-4 rounded-lg border border-gold/30 bg-gold/5">
           <div className="flex items-center gap-2 mb-2">
             <Key className="h-4 w-4 text-gold" />
-            <span className="text-[10px] tracking-[0.2em] text-muted-foreground">ACCESS KEY / CREDENTIALS</span>
+            <span className="text-[10px] tracking-[0.2em] text-muted-foreground">🔑 ACCESS KEY / CREDENTIALS</span>
           </div>
-          <div className="flex items-center justify-between gap-3 bg-background/60 rounded-md p-3 border border-border">
+          <div className="flex items-center justify-between gap-3 bg-background/60 rounded-md p-3 border border-gold/20">
             <code className="text-xs font-mono text-gold break-all">{purchase.credentials}</code>
             <button
               onClick={() => copy(purchase.credentials!)}
-              className="flex-shrink-0 rounded border border-border px-3 py-1.5 text-[10px] text-muted-foreground hover:text-primary hover:border-primary transition flex items-center gap-1"
+              className="flex-shrink-0 rounded border border-gold/30 px-3 py-1.5 text-[10px] text-gold hover:bg-gold/10 transition flex items-center gap-1"
             >
               <Copy className="h-3.5 w-3.5" /> COPY
             </button>
           </div>
         </div>
-      )}
+      ) : null}
 
-      {/* ✅ DOWNLOAD LINKS - Properly styled */}
+      {/* Download Links */}
       {files.length === 0 ? (
         <p className="mt-5 rounded border border-border p-6 text-center text-xs text-muted-foreground">
           {purchase?.status === 'pending' 
@@ -110,9 +110,9 @@ export function DownloadModal({
                   href={f.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="rounded bg-primary px-4 py-1.5 text-[10px] font-bold text-primary-foreground hover:opacity-90 transition flex items-center gap-1.5"
+                  className="rounded border border-primary/50 px-3 py-1.5 text-[10px] text-primary hover:bg-accent transition flex items-center gap-1"
                 >
-                  <Download className="h-3.5 w-3.5" /> DOWNLOAD
+                  <ExternalLink className="h-3.5 w-3.5" /> OPEN
                 </a>
               </div>
             </div>
@@ -120,7 +120,7 @@ export function DownloadModal({
         </div>
       )}
 
-      {/* ✅ Status */}
+      {/* Status */}
       <div className="mt-4 pt-4 border-t border-border/60">
         <p className="text-[10px] text-center text-muted-foreground">
           {purchase?.status === 'pending' 
