@@ -23,7 +23,6 @@ export function DownloadModal({
     }
   };
 
-  // ✅ Get discord URL from settings with fallback
   const discordUrl = settings?.discordUrl || "https://discord.com/app";
 
   return (
@@ -55,23 +54,26 @@ export function DownloadModal({
         {files.length > 0 ? 'Official and verified download links' : 'No links available yet'}
       </p>
 
-      {/* Show Access Key */}
+      {/* ✅ ACCESS KEY - Properly styled with theme */}
       {purchase?.credentials && (
-        <div className="mt-3 p-3 rounded border border-gold/30 bg-gold/5 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className="mt-4 p-4 rounded-lg border border-gold/30 bg-gold/5">
+          <div className="flex items-center gap-2 mb-2">
             <Key className="h-4 w-4 text-gold" />
-            <span className="text-[10px] text-muted-foreground">ACCESS KEY:</span>
-            <span className="text-xs font-mono text-gold">{purchase.credentials}</span>
+            <span className="text-[10px] tracking-[0.2em] text-muted-foreground">ACCESS KEY / CREDENTIALS</span>
           </div>
-          <button
-            onClick={() => copy(purchase.credentials!)}
-            className="rounded border border-border p-1.5 text-muted-foreground hover:text-primary transition"
-          >
-            <Copy className="h-3.5 w-3.5" />
-          </button>
+          <div className="flex items-center justify-between gap-3 bg-background/60 rounded-md p-3 border border-border">
+            <code className="text-xs font-mono text-gold break-all">{purchase.credentials}</code>
+            <button
+              onClick={() => copy(purchase.credentials!)}
+              className="flex-shrink-0 rounded border border-border px-3 py-1.5 text-[10px] text-muted-foreground hover:text-primary hover:border-primary transition flex items-center gap-1"
+            >
+              <Copy className="h-3.5 w-3.5" /> COPY
+            </button>
+          </div>
         </div>
       )}
 
+      {/* ✅ DOWNLOAD LINKS - Properly styled */}
       {files.length === 0 ? (
         <p className="mt-5 rounded border border-border p-6 text-center text-xs text-muted-foreground">
           {purchase?.status === 'pending' 
@@ -79,44 +81,55 @@ export function DownloadModal({
             : 'NO LINKS ADDED YET'}
         </p>
       ) : (
-        <div className="mt-5 max-h-[45vh] space-y-2 overflow-y-auto pr-1">
-          {files.map((f) => (
+        <div className="mt-5 max-h-[45vh] space-y-3 overflow-y-auto pr-1">
+          {files.map((f, index) => (
             <div
               key={f.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded border border-border bg-background/60 p-3 transition hover:border-primary"
+              className="rounded-lg border border-border bg-background/40 p-4 transition hover:border-primary/30"
             >
-              <div className="min-w-0">
-                <p className="flex flex-wrap items-center gap-2 text-xs font-bold text-foreground">
-                  {f.label || 'Download'}
-                  {f.tag ? (
-                    <span className="rounded border border-primary/50 px-2 py-0.5 text-[9px] text-primary">
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-muted-foreground tracking-[0.15em]">FILE {index + 1}</span>
+                  {f.tag && (
+                    <span className="rounded-full border border-primary/40 px-2 py-0.5 text-[9px] text-primary">
                       {f.tag}
                     </span>
-                  ) : null}
-                </p>
-                <p className="mt-1 truncate text-[10px] text-muted-foreground">{f.url}</p>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-2">
+              <p className="text-sm font-bold text-primary">{f.label || 'Download'}</p>
+              <p className="mt-1 truncate text-[10px] text-muted-foreground font-mono">{f.url}</p>
+              <div className="mt-3 flex items-center gap-2">
                 <button
                   onClick={() => void copy(f.url)}
-                  aria-label={`Copy link for ${f.label}`}
-                  className="rounded border border-border p-2 text-muted-foreground transition hover:text-primary"
+                  className="rounded border border-border px-3 py-1.5 text-[10px] text-muted-foreground hover:text-primary hover:border-primary transition flex items-center gap-1"
                 >
-                  <Copy className="h-3.5 w-3.5" />
+                  <Copy className="h-3.5 w-3.5" /> COPY LINK
                 </button>
                 <a
                   href={f.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 rounded bg-primary px-3 py-2 text-[10px] font-bold text-primary-foreground hover:opacity-90"
+                  className="rounded bg-primary px-4 py-1.5 text-[10px] font-bold text-primary-foreground hover:opacity-90 transition flex items-center gap-1.5"
                 >
-                  DOWNLOAD <Download className="h-3.5 w-3.5" />
+                  <Download className="h-3.5 w-3.5" /> DOWNLOAD
                 </a>
               </div>
             </div>
           ))}
         </div>
       )}
+
+      {/* ✅ Status */}
+      <div className="mt-4 pt-4 border-t border-border/60">
+        <p className="text-[10px] text-center text-muted-foreground">
+          {purchase?.status === 'pending' 
+            ? '⏳ Waiting for admin approval' 
+            : purchase?.status === 'active' 
+            ? '✅ License Active' 
+            : '⛔ License Expired'}
+        </p>
+      </div>
     </Modal>
   );
 }
