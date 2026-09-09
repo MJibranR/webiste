@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { ensureSeed, getProducts, getPurchases, type Product, type Purchase, type User } from "./spiderhex";
+import { fetchProducts, fetchPurchases, type Product, type Purchase, type User } from "./spiderhex";
 
 /** Members stored online (profiles + roles). */
 export async function fetchMembers(): Promise<User[]> {
@@ -23,29 +23,30 @@ export async function fetchMembers(): Promise<User[]> {
   }));
 }
 
+/** Live view of the online catalog, orders and members. */
 export function useLive() {
-  const [products, setProductsState] = useState<Product[]>([]);
-  const [purchases, setPurchasesState] = useState<Purchase[]>([]);
-  const [users, setUsersState] = useState<User[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [ready, setReady] = useState(false);
 
-  const sync = useCallback(() => {
-    setProductsState(getProducts());
-    setPurchasesState(getPurchases());
-    void fetchMembers().then(setUsersState).catch(() => setUsersState([]));
+  const sync = useCallback(async () => {
+    const [p, o, m] = await Promise.all([
+      fetchProducts().catch(() => [] as Product[]),
+      fetchPurchases().catch(() => [] as Purchase[]),
+      fetchMembers().catch(() => [] as User[]),
+    ]);
+    setProducts(p);
+    setPurchases(o);
+    setUsers(m);
+    setReady(true);
   }, []);
 
   useEffect(() => {
-    ensureSeed();
-    sync();
-    setReady(true);
-    const handler = () => sync();
+    void sync();
+    const handler = () => void sync();
     window.addEventListener("sh:update", handler);
-    window.addEventListener("storage", handler);
-    return () => {
-      window.removeEventListener("sh:update", handler);
-      window.removeEventListener("storage", handler);
-    };
+    return () => window.removeEventListener("sh:update", handler);
   }, [sync]);
 
   return { products, purchases, users, ready, sync };
