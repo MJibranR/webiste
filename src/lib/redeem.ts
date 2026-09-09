@@ -22,6 +22,7 @@ export interface RedeemCode {
   usage_limit: number;
   usage_count: number;
   files: string | null;
+  used_by: string[]; // Array of user IDs who used this code
 }
 
 export function generateCode(): string {
@@ -63,6 +64,7 @@ export async function listAllCodes(): Promise<RedeemCode[]> {
     usage_limit: item.usage_limit ?? 1,
     usage_count: item.usage_count ?? 0,
     files: item.files || null,
+    used_by: item.used_by || [],
   }));
 }
 
@@ -89,6 +91,7 @@ export async function createCode(data: {
       usage_limit: data.usageLimit || 1,
       usage_count: 0,
       files: filesJson,
+      used_by: [], // Start with empty array
       created_at: new Date().toISOString(),
     };
 
@@ -138,7 +141,7 @@ export async function redeemCodeAction(code: string, userId: string): Promise<{
     const cleanCode = code.trim().toUpperCase();
     console.log('🔍 Redeem called with:', { cleanCode, userId });
     
-    // ✅ Get the code
+    // ✅ Get the code from database
     const { data: codes, error: fetchError } = await supabase
       .from('redeem_codes')
       .select('*')
@@ -163,13 +166,12 @@ export async function redeemCodeAction(code: string, userId: string): Promise<{
     const redeem = codes[0];
     console.log('✅ Code found:', redeem);
     
-    // ✅ CHECK 1: Is the code already fully used?
+    // ✅ CHECK 1: Is the code fully used?
     const currentUsage = redeem.usage_count || 0;
     const maxUsage = redeem.usage_limit || 1;
     
     console.log('📊 Usage:', currentUsage, '/', maxUsage === -1 ? '∞' : maxUsage);
     
-    // ✅ FIX: Handle unlimited usage (-1) correctly
     if (maxUsage !== -1 && currentUsage >= maxUsage) {
       console.log('❌ Code usage limit reached');
       return { 
@@ -178,34 +180,52 @@ export async function redeemCodeAction(code: string, userId: string): Promise<{
       };
     }
     
-    // ✅ CHECK 2: Did this user already use this code? (Only if claimed_by is set)
-    if (redeem.claimed_by && redeem.claimed_by === userId) {
-      console.log('❌ User already used this code');
+    // ✅ CHECK 2: Parse the used_by array
+    let usedBy: string[] = [];
+    if (redeem.used_by) {
+      try {
+        usedBy = typeof redeem.used_by === 'string' 
+          ? JSON.parse(redeem.used_by) 
+          : redeem.used_by;
+        if (!Array.isArray(usedBy)) {
+          usedBy = [];
+        }
+      } catch {
+        usedBy = [];
+      }
+    }
+    
+    console.log('👥 Users who used this code:', usedBy);
+    
+    // ✅ CHECK 3: Did THIS user already use this code?
+    if (usedBy.includes(userId)) {
+      console.log('❌ User already used this code:', userId);
       return { 
         success: false, 
         message: 'YOU ALREADY USED THIS CODE' 
       };
     }
     
-    // ✅ UPDATE: Increment usage count
+    // ✅ UPDATE: Increment usage count and add user to used_by
     const newCount = currentUsage + 1;
-    // ✅ FIX: Only mark as fully used if maxUsage is NOT -1 (unlimited)
+    usedBy.push(userId); // Add current user to the list
+    
     const isFullyUsed = maxUsage !== -1 && newCount >= maxUsage;
     
     console.log('🔄 Updating usage to:', newCount, 'Fully used:', isFullyUsed);
+    console.log('📝 Updated used_by:', usedBy);
     
     // ✅ Build update data
     const updateData: any = {
       usage_count: newCount,
+      used_by: JSON.stringify(usedBy), // Store all users who used this code
     };
     
-    // ✅ Only set claimed_by/claimed_at if the code is fully used OR if it's a single-use code
-    if (isFullyUsed || maxUsage === 1) {
+    // ✅ Only set claimed_by/claimed_at if the code is fully used
+    if (isFullyUsed) {
       updateData.claimed_by = userId;
       updateData.claimed_at = new Date().toISOString();
     }
-    // ✅ For unlimited codes (-1), don't set claimed_by so others can still use it
-    // But we DO track usage_count so we know how many times it's been used
     
     const { error: updateError } = await supabase
       .from('redeem_codes')
@@ -224,7 +244,9 @@ export async function redeemCodeAction(code: string, userId: string): Promise<{
     let files: DownloadFile[] = [];
     if (redeem.files) {
       try {
-        files = JSON.parse(redeem.files);
+        files = typeof redeem.files === 'string' 
+          ? JSON.parse(redeem.files) 
+          : redeem.files;
         if (!Array.isArray(files)) {
           files = [];
         }
@@ -254,9 +276,11 @@ export async function redeemCodeAction(code: string, userId: string): Promise<{
       files: files as any,
       credentials: redeem.access_key || '',
       is_redeem: true,
+      purchase_date: new Date().toISOString(),
+      redeem_code: redeem.code, // Store which code was used
     };
     
-    console.log('📝 Creating purchase:', purchaseData);
+    console.log('📝 Creating purchase record:', purchaseData);
     
     const { error: purchaseError } = await supabase
       .from('purchases')

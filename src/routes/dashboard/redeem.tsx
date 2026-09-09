@@ -37,12 +37,12 @@ function RedeemPage() {
     }
   }, [user]);
 
+  // ✅ Load ALL redeemed codes for this user
   const loadRedeemed = async () => {
     if (!user) return;
     setLoadingRedeemed(true);
     try {
-      // ✅ FIX: Query purchases table instead of redeem_codes
-      // This shows ALL products the user has redeemed
+      // Query purchases table for all redeemed items
       const { data, error } = await supabase
         .from('purchases')
         .select('*')
@@ -52,7 +52,7 @@ function RedeemPage() {
       
       if (error) {
         console.error('Error loading redeemed codes:', error);
-        // Fallback: Try loading from redeem_codes
+        // Fallback: Try loading from redeem_codes where claimed_by = user
         const { data: fallbackData, error: fallbackError } = await supabase
           .from('redeem_codes')
           .select('*')
@@ -63,11 +63,11 @@ function RedeemPage() {
           setRedeemed(fallbackData || []);
         }
       } else {
-        console.log('📦 Redeemed purchases:', data);
+        console.log('📦 All redeemed purchases for user:', data?.length || 0);
         setRedeemed(data || []);
       }
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error loading redeemed:', error);
     } finally {
       setLoadingRedeemed(false);
     }
@@ -108,7 +108,8 @@ function RedeemPage() {
         setRedeemPopup(purchase);
         toast.success(result.message);
         setCode("");
-        // ✅ Refresh the list immediately
+        
+        // ✅ Refresh the list immediately after successful redeem
         await loadRedeemed();
       } else {
         toast.error(result.message);
@@ -122,7 +123,6 @@ function RedeemPage() {
   };
 
   const getFiles = (item: any) => {
-    // ✅ Handle both purchases and redeem_codes format
     let filesData = item.files;
     if (typeof filesData === 'string') {
       try {
@@ -153,7 +153,7 @@ function RedeemPage() {
   };
 
   const getCodeValue = (item: any) => {
-    return item.code || 'N/A';
+    return item.code || item.redeem_code || 'N/A';
   };
 
   return (
@@ -218,8 +218,10 @@ function RedeemPage() {
                         {codeValue && codeValue !== 'N/A' && (
                           <span className="text-[10px] text-muted-foreground font-mono">({codeValue})</span>
                         )}
-                        {item.usage_limit && item.usage_limit > 1 && (
-                          <span className="text-[10px] text-gold">× {item.usage_count}/{item.usage_limit === -1 ? '∞' : item.usage_limit}</span>
+                        {item.usage_limit && item.usage_limit > 0 && (
+                          <span className="text-[10px] text-gold">
+                            × {item.usage_count || 0}/{item.usage_limit === -1 ? '∞' : item.usage_limit}
+                          </span>
                         )}
                       </div>
                       <p className="text-[10px] text-muted-foreground mt-1">
