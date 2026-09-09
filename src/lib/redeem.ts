@@ -48,7 +48,6 @@ export async function listAllCodes(): Promise<RedeemCode[]> {
     return [];
   }
   
-  // Map the data to include default values for missing fields
   return (data || []).map((item: any) => ({
     id: item.id,
     code: item.code,
@@ -82,7 +81,7 @@ export async function createCode(data: {
     const filesJson = filesArray.length > 0 ? JSON.stringify(filesArray) : null;
     
     const insertData: any = {
-      code: data.code.toUpperCase(),
+      code: data.code.toUpperCase().trim(),
       product_name: data.productName || 'Unknown Panel',
       download_link: data.downloadLink || '',
       access_key: data.accessKey || '',
@@ -138,13 +137,15 @@ export async function redeemCodeAction(code: string, userId: string): Promise<{
   } 
 }> {
   try {
-    console.log('🔍 Looking for code:', code);
+    // ✅ Trim and uppercase the code
+    const cleanCode = code.trim().toUpperCase();
+    console.log('🔍 Looking for code:', cleanCode);
     
-    // ✅ FIX: Don't filter by claimed_by - just get the code
+    // ✅ Query for the code
     const { data: codes, error: fetchError } = await supabase
       .from('redeem_codes')
       .select('*')
-      .eq('code', code.toUpperCase());
+      .eq('code', cleanCode);
     
     if (fetchError) {
       console.error('Fetch error:', fetchError);
@@ -154,14 +155,14 @@ export async function redeemCodeAction(code: string, userId: string): Promise<{
     console.log('📦 Codes found:', codes?.length || 0);
     
     if (!codes || codes.length === 0) {
-      console.log('❌ Code not found:', code);
+      console.log('❌ Code not found:', cleanCode);
       return { success: false, message: 'INVALID CODE' };
     }
     
     const redeem = codes[0];
     console.log('✅ Code found:', redeem);
     
-    // Check if code is already fully used
+    // ✅ Check if code is already fully used
     const currentUsage = redeem.usage_count || 0;
     const maxUsage = redeem.usage_limit || 1;
     
@@ -180,11 +181,11 @@ export async function redeemCodeAction(code: string, userId: string): Promise<{
       return { success: false, message: 'YOU ALREADY USED THIS CODE' };
     }
     
-    // Calculate new usage count
+    // ✅ Calculate new usage count
     const newCount = currentUsage + 1;
     const isFullyUsed = maxUsage !== -1 && newCount >= maxUsage;
     
-    // Update usage count
+    // ✅ Update usage count
     const { error: updateError } = await supabase
       .from('redeem_codes')
       .update({
@@ -199,7 +200,7 @@ export async function redeemCodeAction(code: string, userId: string): Promise<{
       return { success: false, message: 'FAILED TO REDEEM CODE' };
     }
     
-    // Parse files
+    // ✅ Parse files
     let files: DownloadFile[] = [];
     if (redeem.files) {
       try {
@@ -220,6 +221,29 @@ export async function redeemCodeAction(code: string, userId: string): Promise<{
         tag: 'OFFICIAL', 
         url: redeem.download_link 
       }];
+    }
+    
+    // ✅ Also create a purchase record for the user
+    const purchaseData = {
+      user_id: userId,
+      product_id: redeem.product_id || 'redeem',
+      product_name: redeem.product_name || 'Redeemed Panel',
+      plan: 'REDEEM',
+      price: 0,
+      status: 'active',
+      download_link: redeem.download_link || '',
+      files: files as any,
+      credentials: redeem.access_key || '',
+      is_redeem: true,
+    };
+    
+    const { error: purchaseError } = await supabase
+      .from('purchases')
+      .insert(purchaseData);
+    
+    if (purchaseError) {
+      console.error('Error creating purchase for redeem:', purchaseError);
+      // Continue anyway - the redeem was successful
     }
     
     return {

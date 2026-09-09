@@ -68,15 +68,22 @@ function RedeemPage() {
     }
 
     setLoading(true);
-    const result = await redeemCodeAction(code.trim().toUpperCase(), user.id);
-    setLoading(false);
-
-    if (result.success) {
-      toast.success(result.message);
-      setCode("");
-      loadRedeemed();
-    } else {
-      toast.error(result.message);
+    try {
+      const result = await redeemCodeAction(code.trim().toUpperCase(), user.id);
+      console.log('Redeem result:', result);
+      
+      if (result.success) {
+        toast.success(result.message);
+        setCode("");
+        loadRedeemed();
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      console.error('Redeem error:', error);
+      toast.error('Failed to redeem code. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
