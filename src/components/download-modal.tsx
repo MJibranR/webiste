@@ -1,4 +1,4 @@
-import { Copy, Download } from "lucide-react";
+import { Copy, Download, Key } from "lucide-react";
 import { toast } from "sonner";
 import { Modal } from "./modal";
 import { purchaseFiles, type Purchase } from "@/lib/spiderhex";
@@ -11,17 +11,20 @@ export function DownloadModal({
   purchase: Purchase | null;
   onClose: () => void;
 }) {
-  const settings = useSettings();
+  const { settings } = useSettings();
   const files = purchase ? purchaseFiles(purchase) : [];
 
-  const copy = async (url: string) => {
+  const copy = async (text: string) => {
     try {
-      await navigator.clipboard.writeText(url);
-      toast.success("LINK COPIED");
+      await navigator.clipboard.writeText(text);
+      toast.success("COPIED");
     } catch {
       toast.error("COPY BLOCKED BY BROWSER");
     }
   };
+
+  // ✅ Get discord URL from settings with fallback
+  const discordUrl = settings?.discordUrl || "https://discord.com/app";
 
   return (
     <Modal
@@ -38,7 +41,7 @@ export function DownloadModal({
             </p>
           </div>
           <a
-            href={settings.discordUrl || "https://discord.com/app"}
+            href={discordUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="rounded bg-primary px-3 py-2 text-[10px] font-bold text-primary-foreground hover:opacity-90"
@@ -51,6 +54,23 @@ export function DownloadModal({
       <p className="text-center text-[11px] text-muted-foreground">
         {files.length > 0 ? 'Official and verified download links' : 'No links available yet'}
       </p>
+
+      {/* Show Access Key */}
+      {purchase?.credentials && (
+        <div className="mt-3 p-3 rounded border border-gold/30 bg-gold/5 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Key className="h-4 w-4 text-gold" />
+            <span className="text-[10px] text-muted-foreground">ACCESS KEY:</span>
+            <span className="text-xs font-mono text-gold">{purchase.credentials}</span>
+          </div>
+          <button
+            onClick={() => copy(purchase.credentials!)}
+            className="rounded border border-border p-1.5 text-muted-foreground hover:text-primary transition"
+          >
+            <Copy className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
 
       {files.length === 0 ? (
         <p className="mt-5 rounded border border-border p-6 text-center text-xs text-muted-foreground">

@@ -41,6 +41,7 @@ function DownloadsAdmin() {
   const [filter, setFilter] = useState<"all" | "pending" | "active">("all");
   const [editing, setEditing] = useState<Purchase | null>(null);
   const [rows, setRows] = useState<DownloadFile[]>([]);
+  const [credentials, setCredentials] = useState("");
 
   const loadData = async () => {
     setLoading(true);
@@ -49,7 +50,11 @@ function DownloadsAdmin() {
         fetchPurchases(),
         fetchUsers()
       ]);
-      setPurchases(purchasesData);
+      // Remove duplicates by id
+      const uniquePurchases = purchasesData.filter((p, index, self) => 
+        index === self.findIndex((t) => t.id === p.id)
+      );
+      setPurchases(uniquePurchases);
       setUsers(usersData);
     } catch (error) {
       console.error('Error loading data:', error);
@@ -72,6 +77,7 @@ function DownloadsAdmin() {
   const openEditor = (p: Purchase) => {
     const existing = purchaseFiles(p);
     setRows(existing.length ? existing.map((f) => ({ ...f, id: f.id === "legacy" ? uid() : f.id })) : [blank()]);
+    setCredentials(p.credentials || "");
     setEditing(p);
   };
 
@@ -93,10 +99,12 @@ function DownloadsAdmin() {
     
     const wasPending = editing.status === 'pending';
 
+    // ✅ Save with credentials
     const error = await updatePurchase(editing.id, {
       files: clean,
       downloadLink: clean[0]?.url ?? "",
-      status: clean.length > 0 ? 'active' : editing.status
+      status: clean.length > 0 ? 'active' : editing.status,
+      credentials: credentials.trim() || editing.credentials || "",
     });
 
     if (error) {
@@ -118,6 +126,7 @@ function DownloadsAdmin() {
     
     toast.success(wasPending ? "ORDER ACTIVATED ✅" : "CHANGES SAVED");
     setEditing(null);
+    setCredentials("");
     loadData();
   };
 
@@ -140,7 +149,6 @@ function DownloadsAdmin() {
     loadData();
   };
 
-  // ✅ Show loading inside the content
   if (loading) {
     return (
       <>
@@ -182,7 +190,6 @@ function DownloadsAdmin() {
             const isPending = p.status === 'pending';
             return (
               <div key={p.id} className={`panel flex flex-wrap items-center justify-between gap-3 p-4 ${isPending ? 'border-gold/50' : ''}`}>
-                {/* Rest of the card */}
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="text-sm text-primary">{p.productName}</p>
@@ -196,6 +203,9 @@ function DownloadsAdmin() {
                   <p className="text-[11px] text-muted-foreground">
                     {buyer?.email ?? "UNKNOWN"} • ${p.price} • {new Date(p.purchaseDate).toLocaleString()}
                   </p>
+                  {p.credentials && (
+                    <p className="text-[10px] text-gold font-mono mt-1">🔑 {p.credentials}</p>
+                  )}
                   <p className="mt-1 text-[10px] text-muted-foreground">
                     {count === 0 ? "⏳ NO LINKS ADDED" : `📥 ${count} LINK${count > 1 ? "S" : ""} ADDED`}
                   </p>
@@ -228,16 +238,21 @@ function DownloadsAdmin() {
         </div>
       )}
 
-      {/* Modal - keep as is */}
       <Modal
         open={!!editing}
-        onClose={() => setEditing(null)}
+        onClose={() => {
+          setEditing(null);
+          setCredentials("");
+        }}
         sub="DELIVERY SETUP"
         title={editing?.productName ?? ""}
         footer={
           <div className="flex flex-wrap justify-end gap-2">
             <button
-              onClick={() => setEditing(null)}
+              onClick={() => {
+                setEditing(null);
+                setCredentials("");
+              }}
               className="rounded border border-border px-4 py-2 text-[11px] text-muted-foreground hover:text-primary"
             >
               CANCEL
@@ -254,6 +269,19 @@ function DownloadsAdmin() {
         <p className="text-center text-[11px] text-muted-foreground">
           Add all the download links for this product. Empty links are ignored on save.
         </p>
+        
+        {/* ✅ ACCESS KEY FIELD - ADDED */}
+        <div className="mt-4">
+          <label className="text-[10px] text-muted-foreground">🔑 ACCESS KEY / CREDENTIALS (Optional)</label>
+          <input
+            className={`${field} mt-1`}
+            placeholder="username:password or license key"
+            value={credentials}
+            onChange={(e) => setCredentials(e.target.value)}
+          />
+          <p className="text-[9px] text-muted-foreground mt-1">Users will see this key when they download</p>
+        </div>
+
         <div className="mt-4 max-h-[45vh] space-y-3 overflow-y-auto pr-1">
           {rows.map((f, i) => (
             <div key={f.id} className="rounded border border-border bg-background/60 p-3">

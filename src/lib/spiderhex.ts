@@ -237,7 +237,7 @@ export interface Purchase {
   downloadLink: string;
   files?: DownloadFile[];
   isRedeem?: boolean;
-  credentials?: string;
+  credentials?: string; 
 }
 
 export interface AppNotification {
@@ -412,7 +412,7 @@ export async function createPurchase(input: {
   status?: Purchase["status"];
   downloadLink?: string;
   files?: DownloadFile[];
-  credentials?: string;
+  credentials?: string;  // ✅ Added
   isRedeem?: boolean;
 }): Promise<string | null> {
   try {
@@ -425,7 +425,7 @@ export async function createPurchase(input: {
       status: input.status ?? "pending",
       download_link: input.downloadLink ?? "",
       files: (input.files ?? []) as any,
-      credentials: input.credentials ?? "",
+      credentials: input.credentials ?? "",  // ✅ Added
       is_redeem: input.isRedeem ?? false,
     };
     
@@ -448,13 +448,19 @@ export async function createPurchase(input: {
 
 export async function updatePurchase(
   id: string,
-  patch: { status?: Purchase["status"]; files?: DownloadFile[]; downloadLink?: string }
+  patch: { 
+    status?: Purchase["status"]; 
+    files?: DownloadFile[]; 
+    downloadLink?: string;
+    credentials?: string;  // ✅ Added
+  }
 ): Promise<string | null> {
   try {
     const payload: any = {};
     if (patch.status !== undefined) payload.status = patch.status;
     if (patch.files !== undefined) payload.files = patch.files;
     if (patch.downloadLink !== undefined) payload.download_link = patch.downloadLink;
+    if (patch.credentials !== undefined) payload.credentials = patch.credentials; // ✅ Added
     
     const { error } = await supabase
       .from("purchases")
