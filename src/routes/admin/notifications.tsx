@@ -3,13 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AdminShell } from "@/components/admin-shell";
 import { SectionTitle } from "@/components/shell";
-import { useLive } from "@/lib/use-live";
-import {
-  deleteNotification,
-  getNotifications,
-  pushNotification,
-  type AppNotification,
-} from "@/lib/spiderhex";
+import { fetchUsers, pushNotification, fetchNotifications, deleteNotification, type AppNotification } from "@/lib/spiderhex";
 
 export const Route = createFileRoute("/admin/notifications")({
   component: () => (
@@ -24,48 +18,77 @@ export const Route = createFileRoute("/admin/notifications")({
         name: "description",
         content: "Send announcements and order updates to SPIDER HEX members from the admin console.",
       },
-      { property: "og:title", content: "Notifications — SPIDER HEX Admin" },
-      { property: "og:description", content: "Broadcast announcements to all members or message one member." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
 });
 
 function NotificationsAdmin() {
-  const { users } = useLive();
+  const [users, setUsers] = useState<any[]>([]);
   const [target, setTarget] = useState("*");
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [sent, setSent] = useState<AppNotification[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const sync = useCallback(() => {
-    setSent([...getNotifications()].sort((a, b) => b.date.localeCompare(a.date)));
+  const sync = useCallback(async () => {
+    try {
+      const data = await fetchNotifications();
+      setSent(data.sort((a, b) => b.date.localeCompare(a.date)));
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    }
   }, []);
 
   useEffect(() => {
-    sync();
-    const handler = () => sync();
-    window.addEventListener("sh:update", handler);
-    return () => window.removeEventListener("sh:update", handler);
+    async function loadUsers() {
+      setLoading(true);
+      try {
+        const usersData = await fetchUsers();
+        setUsers(usersData);
+        await sync();
+      } catch (error) {
+        console.error('Error loading data:', error);
+        toast.error('Failed to load data');
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadUsers();
   }, [sync]);
 
-  const send = () => {
+  const send = async () => {
     if (!title.trim() || !message.trim()) {
       toast.error("TITLE AND MESSAGE REQUIRED");
       return;
     }
-    pushNotification(target, title.trim(), message.trim());
+    await pushNotification(target, title.trim(), message.trim());
     setTitle("");
     setMessage("");
     toast.success("NOTIFICATION SENT");
-    sync();
+    await sync();
   };
 
   const nameFor = (id: string) =>
     id === "*" ? "ALL MEMBERS" : users.find((u) => u.id === id)?.fullName ?? "UNKNOWN";
 
+  const handleDelete = async (id: string) => {
+    await deleteNotification(id);
+    await sync();
+    toast.success("NOTIFICATION DELETED");
+  };
+
   const field = "w-full rounded border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:border-primary";
+
+  if (loading) {
+    return (
+      <AdminShell>
+        <SectionTitle sub="// BROADCAST TO MEMBERS">NOTIFICATIONS</SectionTitle>
+        <div className="flex justify-center items-center py-20">
+          <p className="text-sm text-muted-foreground">LOADING...</p>
+        </div>
+      </AdminShell>
+    );
+  }
 
   return (
     <>
@@ -117,10 +140,7 @@ function NotificationsAdmin() {
                   </p>
                 </div>
                 <button
-                  onClick={() => {
-                    deleteNotification(n.id);
-                    sync();
-                  }}
+                  onClick={() => handleDelete(n.id)}
                   className="rounded border border-danger/50 px-3 py-1.5 text-[10px] text-danger transition hover:bg-danger/10"
                 >
                   DELETE

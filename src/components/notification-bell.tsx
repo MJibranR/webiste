@@ -1,7 +1,7 @@
 import { Bell } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { markAllRead, notificationsFor, type AppNotification } from "@/lib/spiderhex";
+import { fetchNotifications, markAllRead, type AppNotification } from "@/lib/spiderhex";
 
 export function NotificationBell() {
   const { user } = useAuth();
@@ -9,20 +9,19 @@ export function NotificationBell() {
   const [items, setItems] = useState<AppNotification[]>([]);
   const boxRef = useRef<HTMLDivElement>(null);
 
-  const sync = useCallback(() => {
-    setItems(user ? notificationsFor(user.id) : []);
+  const sync = useCallback(async () => {
+    if (!user) return;
+    const data = await fetchNotifications();
+    // Filter for this user
+    const userItems = data.filter((n) => n.userId === user.id || n.userId === "*");
+    setItems(userItems);
   }, [user]);
 
   useEffect(() => {
-    sync();
-    const handler = () => sync();
-    window.addEventListener("sh:update", handler);
-    window.addEventListener("storage", handler);
-    return () => {
-      window.removeEventListener("sh:update", handler);
-      window.removeEventListener("storage", handler);
-    };
-  }, [sync]);
+    if (user) {
+      sync();
+    }
+  }, [user, sync]);
 
   useEffect(() => {
     if (!open) return;

@@ -1,11 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { AdminShell } from "@/components/admin-shell";
 import { SectionTitle } from "@/components/shell";
 import { useAuth } from "@/lib/auth";
-import { useLive } from "@/lib/use-live";
-import { logActivity, notify, pushNotification, type Role } from "@/lib/spiderhex";
+import { fetchUsers, fetchPurchases, logActivity, pushNotification, type Role, type User } from "@/lib/spiderhex";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/admin/users")({
@@ -18,10 +17,6 @@ export const Route = createFileRoute("/admin/users")({
     meta: [
       { title: "Members — SPIDER HEX Admin" },
       { name: "description", content: "Browse SPIDER HEX members, change roles and adjust wallet balances." },
-      { property: "og:title", content: "Members — SPIDER HEX Admin" },
-      { property: "og:description", content: "Member directory with role and wallet controls." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
 });
@@ -30,9 +25,32 @@ const QUICK = [1, 5, 10];
 
 function UsersAdmin() {
   const { user: me } = useAuth();
-  const { users, purchases, sync } = useLive();
+  const [users, setUsers] = useState<User[]>([]);
+  const [purchases, setPurchases] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [custom, setCustom] = useState<Record<string, string>>({});
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [usersData, purchasesData] = await Promise.all([
+        fetchUsers(),
+        fetchPurchases()
+      ]);
+      setUsers(usersData);
+      setPurchases(purchasesData);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      toast.error('Failed to load data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const q = query.trim().toLowerCase();
   const list = users.filter(
@@ -56,8 +74,7 @@ function UsersAdmin() {
     );
     logActivity("wallet", "ADMIN", `${delta > 0 ? "Added" : "Removed"} $${Math.abs(delta)} for ${target.email}`);
     toast.success(`WALLET UPDATED — $${next.toFixed(2)}`);
-    sync();
-    notify();
+    loadData();
   };
 
   const applyCustom = (id: string, sign: 1 | -1) => {
@@ -81,9 +98,19 @@ function UsersAdmin() {
     pushNotification(id, "ROLE UPDATED", `Your account role is now ${role.toUpperCase()}.`);
     logActivity("user", "ADMIN", `Changed role of ${target.email} to ${role}`);
     toast.success(`ROLE SET TO ${role.toUpperCase()}`);
-    sync();
-    notify();
+    loadData();
   };
+
+  if (loading) {
+    return (
+      <AdminShell>
+        <SectionTitle sub="// MEMBER DIRECTORY">USERS</SectionTitle>
+        <div className="flex justify-center items-center py-20">
+          <p className="text-sm text-muted-foreground">LOADING...</p>
+        </div>
+      </AdminShell>
+    );
+  }
 
   return (
     <>

@@ -1,17 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminShell } from "@/components/admin-shell";
 import { SectionTitle } from "@/components/shell";
 import { Modal } from "@/components/modal";
-import { useLive } from "@/lib/use-live";
+import { supabase } from "@/integrations/supabase/client";
 import {
   logActivity,
   purchaseFiles,
   pushNotification,
-  setPurchases,
   uid,
+  fetchPurchases,
+  fetchUsers,
+  updatePurchase,
   type DownloadFile,
   type Purchase,
 } from "@/lib/spiderhex";
@@ -33,10 +35,33 @@ export const Route = createFileRoute("/admin/downloads")({
 const field = "w-full rounded border border-border bg-background/60 px-3 py-2 text-xs text-foreground outline-none focus:border-primary";
 
 function DownloadsAdmin() {
-  const { purchases, users } = useLive();
+  const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "pending" | "active">("all");
   const [editing, setEditing] = useState<Purchase | null>(null);
   const [rows, setRows] = useState<DownloadFile[]>([]);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [purchasesData, usersData] = await Promise.all([
+        fetchPurchases(),
+        fetchUsers()
+      ]);
+      setPurchases(purchasesData);
+      setUsers(usersData);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      toast.error('Failed to load data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const list = filter === "pending" 
     ? purchases.filter((p) => p.status === "pending") 
@@ -55,7 +80,7 @@ function DownloadsAdmin() {
   const update = (id: string, patch: Partial<DownloadFile>) =>
     setRows((r) => r.map((f) => (f.id === id ? { ...f, ...patch } : f)));
 
-  const save = () => {
+  const save = async () => {
     if (!editing) return;
     const clean = rows
       .map((f) => ({ ...f, label: f.label.trim(), tag: f.tag.trim(), url: f.url.trim() }))
@@ -66,29 +91,24 @@ function DownloadsAdmin() {
       return;
     }
     
-    const hadLinks = purchaseFiles(editing).length > 0;
     const wasPending = editing.status === 'pending';
 
-    setPurchases(
-      purchases.map((p) =>
-        p.id === editing.id 
-          ? { 
-              ...p, 
-              files: clean, 
-              downloadLink: clean[0]?.url ?? "",
-              status: clean.length > 0 ? 'active' : p.status
-            } 
-          : p,
-      ),
-    );
+    const error = await updatePurchase(editing.id, {
+      files: clean,
+      downloadLink: clean[0]?.url ?? "",
+      status: clean.length > 0 ? 'active' : editing.status
+    });
 
-    if (clean.length > 0) {
-      pushNotification(
-        editing.userId,
-        wasPending ? "✅ ORDER ACTIVATED" : "📥 DOWNLOAD LINKS UPDATED",
-        `${clean.length} download link${clean.length > 1 ? "s are" : " is"} now available for ${editing.productName}.`,
-      );
+    if (error) {
+      toast.error('Failed to save changes');
+      return;
     }
+
+    pushNotification(
+      editing.userId,
+      wasPending ? "✅ ORDER ACTIVATED" : "📥 DOWNLOAD LINKS UPDATED",
+      `${clean.length} download link${clean.length > 1 ? "s are" : " is"} now available for ${editing.productName}.`,
+    );
     
     logActivity(
       "download",
@@ -98,11 +118,18 @@ function DownloadsAdmin() {
     
     toast.success(wasPending ? "ORDER ACTIVATED ✅" : "CHANGES SAVED");
     setEditing(null);
+    loadData();
   };
 
-  const toggleStatus = (p: Purchase) => {
+  const toggleStatus = async (p: Purchase) => {
     const next = p.status === "active" ? "expired" : "active";
-    setPurchases(purchases.map((x) => (x.id === p.id ? { ...x, status: next } : x)));
+    
+    const error = await updatePurchase(p.id, { status: next });
+    if (error) {
+      toast.error('Failed to update status');
+      return;
+    }
+
     pushNotification(
       p.userId,
       "LICENSE STATUS CHANGED",
@@ -110,7 +137,20 @@ function DownloadsAdmin() {
     );
     logActivity("download", "ADMIN", `Set ${p.productName} license to ${next}`);
     toast.success(`STATUS CHANGED TO ${next.toUpperCase()}`);
+    loadData();
   };
+
+  // ✅ Show loading inside the content
+  if (loading) {
+    return (
+      <>
+        <SectionTitle sub="// DELIVERY CONTROL">DOWNLOAD LINKS</SectionTitle>
+        <div className="flex justify-center items-center py-20">
+          <p className="text-sm text-muted-foreground">LOADING...</p>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -142,6 +182,7 @@ function DownloadsAdmin() {
             const isPending = p.status === 'pending';
             return (
               <div key={p.id} className={`panel flex flex-wrap items-center justify-between gap-3 p-4 ${isPending ? 'border-gold/50' : ''}`}>
+                {/* Rest of the card */}
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="text-sm text-primary">{p.productName}</p>
@@ -187,6 +228,7 @@ function DownloadsAdmin() {
         </div>
       )}
 
+      {/* Modal - keep as is */}
       <Modal
         open={!!editing}
         onClose={() => setEditing(null)}

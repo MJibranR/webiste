@@ -1,12 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Download, Store, Wallet } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { DownloadModal } from "@/components/download-modal";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { SectionTitle } from "@/components/shell";
 import { useAuth } from "@/lib/auth";
-import { useLive } from "@/lib/use-live";
-import { purchaseFiles, topUpMessage, waLink, type Purchase } from "@/lib/spiderhex";
+import { fetchPurchases, purchaseFiles, topUpMessage, waLink, type Purchase } from "@/lib/spiderhex";
 
 export const Route = createFileRoute("/dashboard/")({
   component: DashboardPage,
@@ -30,16 +30,46 @@ function DashboardPage() {
 
 function DashboardInner() {
   const { user } = useAuth();
-  const { purchases } = useLive();
+  const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<Purchase | null>(null);
+
   if (!user) return null;
 
-  const mine = purchases.filter((p) => p.userId === user.id);
+  useEffect(() => {
+    async function loadPurchases() {
+      setLoading(true);
+      try {
+        // ✅ Load purchases from DATABASE
+        const data = await fetchPurchases();
+        // Filter for current user
+        const userPurchases = data.filter((p) => p.userId === user.id);
+        setPurchases(userPurchases);
+        console.log('📦 Purchases loaded for user:', userPurchases);
+      } catch (error) {
+        console.error('Error loading purchases:', error);
+        toast.error('Failed to load purchases');
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadPurchases();
+  }, [user.id]);
+
+  const mine = purchases;
   const spent = mine.reduce((s, p) => s + p.price, 0);
 
   const topUp = (amount: number) => {
     window.open(waLink(topUpMessage(user.fullName, user.email, amount)), "_blank", "noopener");
   };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-20">
+        <p className="text-sm text-muted-foreground">LOADING DASHBOARD...</p>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -85,35 +115,48 @@ function DashboardInner() {
           </div>
         ) : (
           <div className="space-y-3">
-            {mine.map((p) => (
-              <div key={p.id} className="panel flex flex-wrap items-center justify-between gap-3 p-4">
-                <div>
-                  <p className="text-sm text-primary">{p.productName}</p>
-                  <p className="text-[11px] text-muted-foreground">
-                    ${p.price} • {new Date(p.purchaseDate).toLocaleDateString()}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`rounded border px-2 py-1 text-[10px] ${
-                      p.status === "active" ? "border-primary/60 text-primary" : "border-danger/60 text-danger"
-                    }`}
-                  >
-                    {p.status.toUpperCase()}
-                  </span>
-                  {purchaseFiles(p).length > 0 ? (
-                    <button
-                      onClick={() => setOpen(p)}
-                      className="rounded bg-primary px-3 py-2 text-[11px] font-bold text-primary-foreground hover:opacity-90"
+            {mine.map((p) => {
+              const files = purchaseFiles(p);
+              const hasLinks = files.length > 0;
+              return (
+                <div key={p.id} className="panel flex flex-wrap items-center justify-between gap-3 p-4">
+                  <div>
+                    <p className="text-sm text-primary">{p.productName}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      ${p.price} • {new Date(p.purchaseDate).toLocaleDateString()}
+                    </p>
+                    {p.plan && (
+                      <p className="text-[10px] text-muted-foreground">Plan: {p.plan}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={`rounded border px-2 py-1 text-[10px] ${
+                        p.status === "active" 
+                          ? "border-primary/60 text-primary" 
+                          : p.status === "pending" 
+                          ? "border-gold/60 text-gold" 
+                          : "border-danger/60 text-danger"
+                      }`}
                     >
-                      DOWNLOAD TOOL
-                    </button>
-                  ) : (
-                    <span className="text-[10px] text-muted-foreground">LINK PENDING</span>
-                  )}
+                      {p.status.toUpperCase()}
+                    </span>
+                    {hasLinks && p.status === "active" ? (
+                      <button
+                        onClick={() => setOpen(p)}
+                        className="rounded bg-primary px-3 py-2 text-[11px] font-bold text-primary-foreground hover:opacity-90"
+                      >
+                        DOWNLOAD TOOL ({files.length})
+                      </button>
+                    ) : p.status === "pending" ? (
+                      <span className="text-[10px] text-gold">⏳ WAITING FOR ADMIN</span>
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground">LINK PENDING</span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

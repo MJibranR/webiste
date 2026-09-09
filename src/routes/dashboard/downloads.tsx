@@ -1,11 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { SectionTitle } from "@/components/shell";
 import { DownloadModal } from "@/components/download-modal";
 import { useAuth } from "@/lib/auth";
-import { useLive } from "@/lib/use-live";
-import { purchaseFiles, type Purchase } from "@/lib/spiderhex";
+import { fetchPurchases, purchaseFiles, type Purchase } from "@/lib/spiderhex";
 
 export const Route = createFileRoute("/dashboard/downloads")({
   component: () => (
@@ -23,10 +23,42 @@ export const Route = createFileRoute("/dashboard/downloads")({
 
 function Downloads() {
   const { user } = useAuth();
-  const { purchases } = useLive();
+  const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<Purchase | null>(null);
+
+  useEffect(() => {
+    async function loadPurchases() {
+      if (!user) return;
+      setLoading(true);
+      try {
+        // ✅ Load purchases from DATABASE
+        const data = await fetchPurchases();
+        const userPurchases = data.filter((p) => p.userId === user.id);
+        setPurchases(userPurchases);
+      } catch (error) {
+        console.error('Error loading purchases:', error);
+        toast.error('Failed to load purchases');
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadPurchases();
+  }, [user]);
+
   if (!user) return null;
-  const mine = purchases.filter((p) => p.userId === user.id);
+
+  if (loading) {
+    return (
+      <DashboardShell>
+        <div className="flex justify-center items-center py-20">
+          <p className="text-sm text-muted-foreground">LOADING...</p>
+        </div>
+      </DashboardShell>
+    );
+  }
+
+  const mine = purchases;
 
   return (
     <>

@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { logActivity, type User, uid, getUsers, setUsers } from "./spiderhex";
+import { getUsers, setUsers, type User, logActivity, uid } from "./spiderhex";
 
 interface AuthValue {
   user: User | null;

@@ -149,10 +149,38 @@ export function Footer() {
 }
 
 export function Page({ children }: { children: ReactNode }) {
-  const { loading } = useSettings();
-  
-  // Show loading state while settings load
-  if (loading) {
+  // ✅ FIX: Wrap in try-catch to prevent crashing
+  try {
+    const { loading } = useSettings();
+    
+    if (loading) {
+      return (
+        <div className="min-h-screen">
+          <Scanlines />
+          <MatrixRain />
+          <TopNav />
+          <main className="mx-auto max-w-6xl px-4 py-8">
+            <div className="flex justify-center items-center min-h-[60vh]">
+              <p className="text-sm text-muted-foreground">LOADING...</p>
+            </div>
+          </main>
+          <Footer />
+        </div>
+      );
+    }
+    
+    return (
+      <div className="min-h-screen">
+        <Scanlines />
+        <MatrixRain />
+        <TopNav />
+        <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
+        <Footer />
+      </div>
+    );
+  } catch (error) {
+    console.error('Page error:', error);
+    // Fallback render
     return (
       <div className="min-h-screen">
         <Scanlines />
@@ -167,16 +195,6 @@ export function Page({ children }: { children: ReactNode }) {
       </div>
     );
   }
-  
-  return (
-    <div className="min-h-screen">
-      <Scanlines />
-      <MatrixRain />
-      <TopNav />
-      <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
-      <Footer />
-    </div>
-  );
 }
 
 export function SectionTitle({ children, sub }: { children: ReactNode; sub?: string }) {

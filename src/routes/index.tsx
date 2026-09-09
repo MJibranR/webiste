@@ -15,13 +15,6 @@ export const Route = createFileRoute("/")({
         content:
           "Unlock premium gaming panels for PC, root, non-root and iOS. Instant download delivery, 99.9% uptime, 80K+ active players.",
       },
-      { property: "og:title", content: "SPIDER HEX — Premium Gaming Panel Store" },
-      {
-        property: "og:description",
-        content: "Premium gaming panels with instant download delivery and 99.9% uptime.",
-      },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
 });
@@ -62,7 +55,7 @@ function Landing() {
   const { settings, loading } = useSettings();
 
   // Show loading state while settings load
-  if (loading || !settings) {
+  if (loading) {
     return (
       <Page>
         <div className="flex justify-center items-center min-h-[60vh]">
@@ -72,7 +65,34 @@ function Landing() {
     );
   }
 
-  const s = settings;
+  // If settings is null, use fallback values
+  const s = settings || {
+    heroBadge: "// SYSTEM ONLINE",
+    heroTitle: "SPIDER HEX",
+    heroSubtitle: "PREMIUM GAMING PANEL STORE • PC / ROOT / NON-ROOT / IOS • LIFETIME ACCESS",
+    heroPrimaryCta: "ENTER STORE",
+    heroSecondaryCta: "CREATE ACCOUNT",
+    heroImages: [],
+    stats: [
+      { value: "80K+", label: "ACTIVE PLAYERS" },
+      { value: "50K+", label: "GIFT KEYS" },
+      { value: "99.9%", label: "UPTIME" },
+    ],
+    featuresHeading: "WHY SPIDER HEX",
+    features: [
+      { title: "LIGHTNING FAST", text: "Instant delivery the moment your order is verified." },
+      { title: "ULTRA SECURE", text: "Encrypted keys, protected sessions, zero leaks." },
+      { title: "PREMIUM QUALITY", text: "Hand-tested panels updated with every patch." },
+      { title: "NEXT LEVEL", text: "Elite tooling built for serious competitors." },
+    ],
+    videosHeading: "LATEST VIDEOS",
+    videosSub: "// STRAIGHT FROM THE CHANNEL",
+    videos: [],
+    secureHeading: "SECURE ACCESS",
+    secureText: "Authenticate to view your licenses, wallet and downloads.",
+    storeHeading: "STORE",
+    storeSub: "// SELECT YOUR WEAPON",
+  };
 
   return (
     <Page>

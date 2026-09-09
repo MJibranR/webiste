@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { AdminShell } from "@/components/admin-shell";
 import { SectionTitle } from "@/components/shell";
 import { supabase } from "@/integrations/supabase/client";
-import { CATEGORIES, type Product } from "@/lib/spiderhex";
+import { fetchCategories, type Category, type Product, uid } from "@/lib/spiderhex";
 
 export const Route = createFileRoute("/admin/products")({
   component: () => (
@@ -16,7 +16,7 @@ export const Route = createFileRoute("/admin/products")({
   head: () => ({
     meta: [
       { title: "Manage Panels — SPIDER HEX Admin" },
-      { name: "description", content: "Create, edit and remove SPIDER HEX gaming panels, prices and stock status." },
+      { name: "description", content: "Create, edit and remove SPIDER HEX gaming panels." },
     ],
   }),
 });
@@ -25,21 +25,25 @@ const empty = (): Product => ({
   id: "",
   name: "",
   price: 0,
-  category: "PC PANEL",
+  priceMonthly: null,
+  priceWeekly: null,
+  category: "",
   badge: "NEW",
   inStock: true,
   downloadLink: "",
   imageUrl: "",
+  description: "",
+  videoUrl: "",
 });
 
 const field = "w-full rounded border border-border bg-background/60 px-3 py-2 text-xs text-foreground outline-none focus:border-primary";
 
 function ProductsAdmin() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [draft, setDraft] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Load products from database
   const loadProducts = async () => {
     setLoading(true);
     try {
@@ -57,11 +61,15 @@ function ProductsAdmin() {
           id: p.id,
           name: p.name,
           price: p.price,
+          priceMonthly: p.price_monthly ?? null,
+          priceWeekly: p.price_weekly ?? null,
           category: p.category,
           badge: p.badge || 'NEW',
           inStock: p.in_stock !== false,
           downloadLink: p.download_link || '',
           imageUrl: p.image_url || '',
+          description: p.description || '',
+          videoUrl: p.video_url || '',
         }));
         setProducts(mappedProducts);
       }
@@ -73,8 +81,19 @@ function ProductsAdmin() {
     }
   };
 
+  const loadCategories = async () => {
+    try {
+      const data = await fetchCategories();
+      setCategories(data);
+    } catch (error) {
+      console.error('Error loading categories:', error);
+      setCategories([]);
+    }
+  };
+
   useEffect(() => {
     loadProducts();
+    loadCategories();
   }, []);
 
   const save = async () => {
@@ -86,17 +105,20 @@ function ProductsAdmin() {
     const productData = {
       name: draft.name.trim(),
       price: draft.price,
+      price_monthly: draft.priceMonthly,
+      price_weekly: draft.priceWeekly,
       category: draft.category,
       badge: draft.badge || 'NEW',
       in_stock: draft.inStock,
       download_link: draft.downloadLink || '',
       image_url: draft.imageUrl || '',
+      description: draft.description || '',
+      video_url: draft.videoUrl || '',
     };
 
     try {
       let error;
       if (draft.id) {
-        // Update existing product - don't include updated_at
         const { error: updateError } = await supabase
           .from('products')
           .update(productData)
@@ -104,7 +126,6 @@ function ProductsAdmin() {
         error = updateError;
         if (!error) toast.success('PRODUCT UPDATED');
       } else {
-        // Insert new product - don't include id or updated_at
         const { error: insertError } = await supabase
           .from('products')
           .insert({
@@ -190,18 +211,19 @@ function ProductsAdmin() {
               className={field}
               type="number"
               min={0}
-              placeholder="PRICE USD"
+              placeholder="BASE PRICE USD"
               value={draft.price}
-              onChange={(e) => setDraft({ ...draft, price: Number(e.target.value) })}
+              onChange={(e) => setDraft({ ...draft, price: Number(e.target.value) || 0 })}
             />
             <select
               className={field}
               value={draft.category}
               onChange={(e) => setDraft({ ...draft, category: e.target.value })}
             >
-              {CATEGORIES.filter((c) => c !== "ALL").map((c) => (
-                <option key={c} value={c}>
-                  {c}
+              <option value="">SELECT CATEGORY</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.name}>
+                  {cat.display_name}
                 </option>
               ))}
             </select>
@@ -211,27 +233,95 @@ function ProductsAdmin() {
               value={draft.badge}
               onChange={(e) => setDraft({ ...draft, badge: e.target.value })}
             />
+          </div>
+
+          {/* ✅ FIXED: Pricing section with correct fields */}
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <label className="text-[10px] text-muted-foreground">LIFETIME PRICE</label>
+              <input
+                className={`${field} mt-1`}
+                type="number"
+                min={0}
+                placeholder="0"
+                value={draft.price ?? ''}
+                onChange={(e) => setDraft({ ...draft, price: Number(e.target.value) || 0 })}
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-muted-foreground">30 DAYS PRICE</label>
+              <input
+                className={`${field} mt-1`}
+                type="number"
+                min={0}
+                placeholder="0"
+                value={draft.priceMonthly ?? ''}
+                onChange={(e) => setDraft({ ...draft, priceMonthly: Number(e.target.value) || null })}
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-muted-foreground">7 DAYS PRICE</label>
+              <input
+                className={`${field} mt-1`}
+                type="number"
+                min={0}
+                placeholder="0"
+                value={draft.priceWeekly ?? ''}
+                onChange={(e) => setDraft({ ...draft, priceWeekly: Number(e.target.value) || null })}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[10px] text-muted-foreground">DESCRIPTION</label>
+            <textarea
+              className={`${field} mt-1 min-h-[80px]`}
+              placeholder="Product description..."
+              value={draft.description || ''}
+              onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+            />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="text-[10px] text-muted-foreground">DEMO VIDEO URL (YouTube)</label>
+              <input
+                className={`${field} mt-1`}
+                placeholder="https://youtube.com/watch?v=..."
+                value={draft.videoUrl || ''}
+                onChange={(e) => setDraft({ ...draft, videoUrl: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-muted-foreground">IMAGE URL</label>
+              <input
+                className={`${field} mt-1`}
+                placeholder="https://example.com/image.jpg"
+                value={draft.imageUrl || ''}
+                onChange={(e) => setDraft({ ...draft, imageUrl: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[10px] text-muted-foreground">DOWNLOAD LINK</label>
             <input
-              className={`${field} sm:col-span-2`}
-              placeholder="DEFAULT DOWNLOAD LINK (OPTIONAL)"
+              className={`${field} mt-1`}
+              placeholder="https://example.com/download.zip"
               value={draft.downloadLink}
               onChange={(e) => setDraft({ ...draft, downloadLink: e.target.value })}
             />
-            <input
-              className={`${field} sm:col-span-2`}
-              placeholder="PANEL IMAGE ADDRESS (OPTIONAL)"
-              value={draft.imageUrl ?? ""}
-              onChange={(e) => setDraft({ ...draft, imageUrl: e.target.value })}
-            />
-            {draft.imageUrl ? (
-              <img
-                src={draft.imageUrl}
-                alt={`${draft.name || "Panel"} preview`}
-                loading="lazy"
-                className="h-28 w-full rounded border border-border object-cover sm:col-span-2"
-              />
-            ) : null}
           </div>
+
+          {draft.imageUrl ? (
+            <img
+              src={draft.imageUrl}
+              alt={`${draft.name || "Panel"} preview`}
+              loading="lazy"
+              className="h-28 w-full rounded border border-border object-cover"
+            />
+          ) : null}
+
           <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
             <input
               type="checkbox"
@@ -240,6 +330,7 @@ function ProductsAdmin() {
             />
             IN STOCK
           </label>
+
           <div className="flex gap-2">
             <button
               onClick={save}
@@ -267,6 +358,7 @@ function ProductsAdmin() {
                 <th className="p-3">NAME</th>
                 <th className="p-3">CATEGORY</th>
                 <th className="p-3">PRICE</th>
+                <th className="p-3">PLANS</th>
                 <th className="p-3">STOCK</th>
                 <th className="p-3 text-right">ACTIONS</th>
               </tr>
@@ -277,6 +369,11 @@ function ProductsAdmin() {
                   <td className="p-3 text-primary">{p.name}</td>
                   <td className="p-3 text-muted-foreground">{p.category}</td>
                   <td className="p-3">${p.price}</td>
+                  <td className="p-3 text-[10px]">
+                    {p.price ? `L:$${p.price}` : ''}
+                    {p.priceMonthly ? ` M:$${p.priceMonthly}` : ''}
+                    {p.priceWeekly ? ` W:$${p.priceWeekly}` : ''}
+                  </td>
                   <td className={`p-3 ${p.inStock ? "text-primary" : "text-danger"}`}>
                     {p.inStock ? "IN STOCK" : "OUT"}
                   </td>
@@ -284,14 +381,12 @@ function ProductsAdmin() {
                     <div className="flex justify-end gap-2">
                       <button
                         onClick={() => setDraft(p)}
-                        aria-label={`Edit ${p.name}`}
                         className="rounded border border-border p-2 text-muted-foreground hover:text-primary"
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
                       <button
                         onClick={() => remove(p.id)}
-                        aria-label={`Delete ${p.name}`}
                         className="rounded border border-danger/50 p-2 text-danger hover:bg-danger/10"
                       >
                         <Trash2 className="h-3.5 w-3.5" />

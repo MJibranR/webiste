@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { AdminShell } from "@/components/admin-shell";
 import { useSettings } from "@/lib/use-settings";
 import { SectionTitle } from "@/components/shell";
-import { DEFAULT_SETTINGS, getSettings, setSettings, uid, type SiteSettings } from "@/lib/spiderhex";
+import { DEFAULT_SETTINGS, type SiteSettings, uid } from "@/lib/spiderhex";
 
 export const Route = createFileRoute("/admin/content")({
   component: () => (
@@ -50,36 +50,46 @@ function Block({ title, children }: { title: string; children: React.ReactNode }
 }
 
 function ContentAdmin() {
+  const { settings, loading, updateSettings } = useSettings();
   const [s, setS] = useState<SiteSettings>(DEFAULT_SETTINGS);
 
   useEffect(() => {
-    setS(getSettings());
-  }, []);
+    if (settings) {
+      setS(settings);
+    }
+  }, [settings]);
 
   const set = <K extends keyof SiteSettings>(key: K, value: SiteSettings[K]) =>
     setS((prev) => ({ ...prev, [key]: value }));
 
-
-
-// In the component:
-const { settings, updateSettings } = useSettings();
-
-const save = async () => {
-  if (!settings) return;
-  const success = await updateSettings(s);
-  if (success) {
-    toast.success("SITE CONTENT SAVED TO DATABASE");
-  } else {
-    toast.error("FAILED TO SAVE");
-  }
-};
+  const save = async () => {
+    if (!s) return;
+    const success = await updateSettings(s);
+    if (success) {
+      toast.success("SITE CONTENT SAVED TO DATABASE");
+    } else {
+      toast.error("FAILED TO SAVE");
+    }
+  };
 
   const reset = () => {
     if (!window.confirm("Reset all texts back to the defaults?")) return;
-    setSettings(DEFAULT_SETTINGS);
     setS(DEFAULT_SETTINGS);
+    // Also save to database
+    updateSettings(DEFAULT_SETTINGS);
     toast.success("CONTENT RESET");
   };
+
+  if (loading || !settings) {
+    return (
+      <AdminShell>
+        <SectionTitle sub="// EDIT EVERY TEXT ON THE SITE">SITE CONTENT</SectionTitle>
+        <div className="flex justify-center items-center py-20">
+          <p className="text-sm text-muted-foreground">LOADING...</p>
+        </div>
+      </AdminShell>
+    );
+  }
 
   return (
     <>
@@ -126,6 +136,162 @@ const save = async () => {
               onChange={(e) => set("topUpTemplate", e.target.value)}
             />
           </Row>
+        </Block>
+
+        <Block title="PRODUCT PAGE SETTINGS">
+          <Row label="PLANS HEADING">
+            <input
+              className={field}
+              value={s.productPage?.heading || ''}
+              onChange={(e) => setS(prev => ({ 
+                ...prev, 
+                productPage: { ...prev.productPage, heading: e.target.value } 
+              }))}
+            />
+          </Row>
+          <Row label="SUPPORT TEXT">
+            <textarea
+              rows={2}
+              className={field}
+              value={s.productPage?.supportText || ''}
+              onChange={(e) => setS(prev => ({ 
+                ...prev, 
+                productPage: { ...prev.productPage, supportText: e.target.value } 
+              }))}
+            />
+          </Row>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Row label="DISCORD BUTTON LABEL">
+              <input
+                className={field}
+                value={s.productPage?.discordLabel || ''}
+                onChange={(e) => setS(prev => ({ 
+                  ...prev, 
+                  productPage: { ...prev.productPage, discordLabel: e.target.value } 
+                }))}
+              />
+            </Row>
+            <Row label="TELEGRAM BUTTON LABEL">
+              <input
+                className={field}
+                value={s.productPage?.telegramLabel || ''}
+                onChange={(e) => setS(prev => ({ 
+                  ...prev, 
+                  productPage: { ...prev.productPage, telegramLabel: e.target.value } 
+                }))}
+              />
+            </Row>
+          </div>
+          <Row label="DUMMY IMAGE URL">
+            <input
+              className={field}
+              value={s.productPage?.dummyImage || ''}
+              onChange={(e) => setS(prev => ({ 
+                ...prev, 
+                productPage: { ...prev.productPage, dummyImage: e.target.value } 
+              }))}
+            />
+          </Row>
+          <Row label="DUMMY VIDEO URL (YouTube Embed)">
+            <input
+              className={field}
+              value={s.productPage?.dummyVideo || ''}
+              onChange={(e) => setS(prev => ({ 
+                ...prev, 
+                productPage: { ...prev.productPage, dummyVideo: e.target.value } 
+              }))}
+            />
+          </Row>
+          <p className="text-[10px] text-muted-foreground">BADGE 1</p>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <input
+              className={field}
+              placeholder="Icon"
+              value={s.productPage?.badge1?.icon || ''}
+              onChange={(e) => setS(prev => ({ 
+                ...prev, 
+                productPage: { ...prev.productPage, badge1: { ...prev.productPage.badge1, icon: e.target.value } } 
+              }))}
+            />
+            <input
+              className={field}
+              placeholder="Title"
+              value={s.productPage?.badge1?.title || ''}
+              onChange={(e) => setS(prev => ({ 
+                ...prev, 
+                productPage: { ...prev.productPage, badge1: { ...prev.productPage.badge1, title: e.target.value } } 
+              }))}
+            />
+            <input
+              className={field}
+              placeholder="Description"
+              value={s.productPage?.badge1?.desc || ''}
+              onChange={(e) => setS(prev => ({ 
+                ...prev, 
+                productPage: { ...prev.productPage, badge1: { ...prev.productPage.badge1, desc: e.target.value } } 
+              }))}
+            />
+          </div>
+          <p className="text-[10px] text-muted-foreground">BADGE 2</p>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <input
+              className={field}
+              placeholder="Icon"
+              value={s.productPage?.badge2?.icon || ''}
+              onChange={(e) => setS(prev => ({ 
+                ...prev, 
+                productPage: { ...prev.productPage, badge2: { ...prev.productPage.badge2, icon: e.target.value } } 
+              }))}
+            />
+            <input
+              className={field}
+              placeholder="Title"
+              value={s.productPage?.badge2?.title || ''}
+              onChange={(e) => setS(prev => ({ 
+                ...prev, 
+                productPage: { ...prev.productPage, badge2: { ...prev.productPage.badge2, title: e.target.value } } 
+              }))}
+            />
+            <input
+              className={field}
+              placeholder="Description"
+              value={s.productPage?.badge2?.desc || ''}
+              onChange={(e) => setS(prev => ({ 
+                ...prev, 
+                productPage: { ...prev.productPage, badge2: { ...prev.productPage.badge2, desc: e.target.value } } 
+              }))}
+            />
+          </div>
+          <p className="text-[10px] text-muted-foreground">BADGE 3</p>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <input
+              className={field}
+              placeholder="Icon"
+              value={s.productPage?.badge3?.icon || ''}
+              onChange={(e) => setS(prev => ({ 
+                ...prev, 
+                productPage: { ...prev.productPage, badge3: { ...prev.productPage.badge3, icon: e.target.value } } 
+              }))}
+            />
+            <input
+              className={field}
+              placeholder="Title"
+              value={s.productPage?.badge3?.title || ''}
+              onChange={(e) => setS(prev => ({ 
+                ...prev, 
+                productPage: { ...prev.productPage, badge3: { ...prev.productPage.badge3, title: e.target.value } } 
+              }))}
+            />
+            <input
+              className={field}
+              placeholder="Description"
+              value={s.productPage?.badge3?.desc || ''}
+              onChange={(e) => setS(prev => ({ 
+                ...prev, 
+                productPage: { ...prev.productPage, badge3: { ...prev.productPage.badge3, desc: e.target.value } } 
+              }))}
+            />
+          </div>
         </Block>
 
         <Block title="HOMEPAGE HERO">

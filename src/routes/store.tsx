@@ -4,9 +4,8 @@ import { toast } from "sonner";
 import { Page, SectionTitle } from "@/components/shell";
 import { useAuth } from "@/lib/auth";
 import { useSettings } from "@/lib/use-settings";
-import { supabase } from "@/integrations/supabase/client";
+import { fetchProducts, fetchCategories, type Category, createPurchase } from "@/lib/spiderhex";
 import {
-  CATEGORIES,
   buyMessage,
   discordCopy,
   getPurchases,
@@ -32,63 +31,65 @@ export const Route = createFileRoute("/store")({
   }),
 });
 
+const getDisplayPrice = (product: Product) => {
+  const prices = [];
+  if (product.price && product.price > 0) prices.push(product.price);
+  if (product.priceMonthly && product.priceMonthly > 0) prices.push(product.priceMonthly);
+  if (product.priceWeekly && product.priceWeekly > 0) prices.push(product.priceWeekly);
+  
+  if (prices.length === 0) return '$0';
+  if (prices.length === 1) return `$${prices[0]}`;
+  
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  return `$${min} - $${max}`;
+};
+
 function StorePage() {
   const { user } = useAuth();
-  const { settings } = useSettings();
+  const { settings, loading: settingsLoading } = useSettings();
   const navigate = useNavigate();
-  const [cat, setCat] = useState<string>("ALL");
+  const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Load products from Supabase database
   useEffect(() => {
-    async function loadProducts() {
+    async function loadData() {
       setLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('products')
-          .select('*')
-          .order('created_at', { ascending: true });
-        
-        if (error) {
-          console.error('Error loading products:', error);
-          setProducts([]);
-        } else {
-          const mappedProducts: Product[] = (data || []).map((p: any) => ({
-            id: p.id,
-            name: p.name,
-            price: p.price,
-            category: p.category,
-            badge: p.badge || 'NEW',
-            inStock: p.in_stock !== false,
-            downloadLink: p.download_link || '',
-            imageUrl: p.image_url || '',
-          }));
-          setProducts(mappedProducts);
-        }
+        const [productsData, categoriesData] = await Promise.all([
+          fetchProducts(),
+          fetchCategories()
+        ]);
+        setProducts(productsData);
+        setCategories(categoriesData);
       } catch (error) {
-        console.error('Error:', error);
+        console.error('Error loading data:', error);
         setProducts([]);
+        setCategories([]);
       } finally {
         setLoading(false);
       }
     }
-    loadProducts();
+    loadData();
   }, []);
 
-  const list = cat === "ALL" ? products : products.filter((p) => p.category === cat);
+  const filteredProducts = selectedCategory === "ALL" 
+    ? products 
+    : products.filter((p) => p.category === selectedCategory);
 
-  const record = (product: Product): Purchase | null => {
+  // ✅ FIX: Save purchase to DATABASE
+  const record = async (product: Product): Promise<Purchase | null> => {
     if (!user) return null;
     
-    const purchase: Purchase = {
-      id: uid(),
+    const purchaseData = {
       userId: user.id,
       productId: product.id,
       productName: product.name,
+      plan: "LIFETIME",
       price: product.price,
-      purchaseDate: new Date().toISOString(),
-      status: 'pending',
+      status: 'pending' as const,
       downloadLink: product.downloadLink || "",
       files: product.downloadLink ? [
         {
@@ -101,7 +102,21 @@ function StorePage() {
       isRedeem: false,
     };
     
-    setPurchases([...getPurchases(), purchase]);
+    // Save to database
+    const error = await createPurchase(purchaseData);
+    if (error) {
+      console.error('Error saving purchase:', error);
+      toast.error('Failed to place order');
+      return null;
+    }
+    
+    // Also save to localStorage for backup
+    const localPurchase: Purchase = {
+      id: uid(),
+      ...purchaseData,
+      purchaseDate: new Date().toISOString(),
+    };
+    setPurchases([...getPurchases(), localPurchase]);
     
     pushNotification(
       user.id,
@@ -110,17 +125,17 @@ function StorePage() {
     );
     
     logActivity("purchase", user.email, `Ordered ${product.name} for $${product.price} (PENDING)`);
-    return purchase;
+    return localPurchase;
   };
 
-  const buy = (product: Product, channel: "whatsapp" | "discord") => {
+  const buy = async (product: Product, channel: "whatsapp" | "discord") => {
     if (!user) {
       toast.error("LOGIN REQUIRED");
       navigate({ to: "/login" });
       return;
     }
     
-    record(product);
+    await record(product);
     const msg = buyMessage(user.fullName, product.name, product.price);
     
     if (channel === "whatsapp") {
@@ -132,41 +147,65 @@ function StorePage() {
     }
   };
 
-  if (loading) {
+  const goToProduct = (productId: string) => {
+    navigate({ to: `/product/${productId}` });
+  };
+
+  if (settingsLoading || loading) {
     return (
       <Page>
-        <SectionTitle sub={settings.storeSub}>{settings.storeHeading}</SectionTitle>
-        <p className="mt-8 text-xs text-muted-foreground">LOADING CATALOG...</p>
+        <div className="flex justify-center items-center py-20">
+          <p className="text-sm text-muted-foreground">LOADING PRODUCTS...</p>
+        </div>
       </Page>
     );
   }
 
+  const storeHeading = settings?.storeHeading || "STORE";
+  const storeSub = settings?.storeSub || "// SELECT YOUR WEAPON";
+
   return (
     <Page>
-      <SectionTitle sub={settings.storeSub}>{settings.storeHeading}</SectionTitle>
+      <SectionTitle sub={storeSub}>
+        {storeHeading}
+      </SectionTitle>
 
       <div className="flex flex-wrap gap-2 text-[11px]">
-        {CATEGORIES.map((c) => (
+        <button
+          onClick={() => setSelectedCategory("ALL")}
+          className={`rounded border px-3 py-2 transition ${
+            selectedCategory === "ALL"
+              ? "border-primary bg-accent text-primary"
+              : "border-border text-muted-foreground hover:text-primary"
+          }`}
+        >
+          ALL
+        </button>
+        {categories.map((cat) => (
           <button
-            key={c}
-            onClick={() => setCat(c)}
+            key={cat.id}
+            onClick={() => setSelectedCategory(cat.name)}
             className={`rounded border px-3 py-2 transition ${
-              cat === c
+              selectedCategory === cat.name
                 ? "border-primary bg-accent text-primary"
                 : "border-border text-muted-foreground hover:text-primary"
             }`}
           >
-            {c}
+            {cat.display_name}
           </button>
         ))}
       </div>
 
-      {list.length === 0 ? (
+      {filteredProducts.length === 0 ? (
         <p className="panel mt-8 p-8 text-center text-xs text-muted-foreground">NO PRODUCTS IN THIS CATEGORY</p>
       ) : (
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {list.map((p) => (
-            <article key={p.id} className="panel flex flex-col p-5 transition hover:-translate-y-1 hover:border-primary">
+          {filteredProducts.map((p) => (
+            <div
+              key={p.id}
+              onClick={() => goToProduct(p.id)}
+              className="cursor-pointer panel flex flex-col p-5 transition hover:-translate-y-1 hover:border-primary"
+            >
               {p.imageUrl ? (
                 <img
                   src={p.imageUrl}
@@ -180,29 +219,23 @@ function StorePage() {
                 <span className="text-[10px] text-muted-foreground">{p.category}</span>
               </div>
               <h3 className="glow-text mt-4 text-sm font-bold tracking-[0.12em] text-primary">{p.name}</h3>
-              <p className="mt-2 text-2xl font-bold text-foreground">${p.price}</p>
+              <p className="mt-2 text-2xl font-bold text-foreground">{getDisplayPrice(p)}</p>
               <p className="mt-1 text-[11px] text-muted-foreground">
                 <span className="status-dot mr-2 align-middle" />
                 {p.inStock ? "IN STOCK • LIFETIME" : "OUT OF STOCK"}
               </p>
               <div className="mt-5 flex gap-2 text-[11px]">
                 <button
-                  onClick={() => buy(p, "whatsapp")}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate({ to: `/product/${p.id}` });
+                  }}
                   className="flex-1 rounded bg-primary px-3 py-2.5 font-bold text-primary-foreground transition hover:opacity-90"
                 >
-                  BUY • WHATSAPP
-                </button>
-                <button
-                  onClick={() => buy(p, "discord")}
-                  className="rounded border border-border px-3 py-2.5 text-muted-foreground transition hover:text-primary"
-                >
-                  DISCORD
+                  VIEW DETAILS
                 </button>
               </div>
-              <p className="mt-2 text-[9px] text-muted-foreground text-center">
-                ⚠️ Payment required. Links appear after admin approval.
-              </p>
-            </article>
+            </div>
           ))}
         </div>
       )}

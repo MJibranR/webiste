@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState, useEffect } from "react";
 import { Boxes, DollarSign, Download, Users } from "lucide-react";
 import { AdminShell } from "@/components/admin-shell";
 import { SectionTitle } from "@/components/shell";
-import { useLive } from "@/lib/use-live";
+import { fetchProducts, fetchPurchases, fetchUsers, type Product, type Purchase, type User } from "@/lib/spiderhex";
 
 export const Route = createFileRoute("/admin/")({
   component: () => (
@@ -23,10 +24,46 @@ export const Route = createFileRoute("/admin/")({
 });
 
 function Overview() {
-  const { products, purchases, users } = useLive();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      setLoading(true);
+      try {
+        const [productsData, purchasesData, usersData] = await Promise.all([
+          fetchProducts(),
+          fetchPurchases(),
+          fetchUsers()
+        ]);
+        setProducts(productsData);
+        setPurchases(purchasesData);
+        setUsers(usersData);
+      } catch (error) {
+        console.error('Error loading admin data:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  if (loading) {
+    return (
+      <AdminShell>
+        <SectionTitle sub="// SYSTEM STATUS">ADMIN OVERVIEW</SectionTitle>
+        <div className="flex justify-center items-center py-20">
+          <p className="text-sm text-muted-foreground">LOADING ADMIN DATA...</p>
+        </div>
+      </AdminShell>
+    );
+  }
+
   const revenue = purchases.reduce((s, p) => s + p.price, 0);
   const members = users.filter((u) => u.role === "user");
-  const pending = purchases.filter((p) => !p.downloadLink).length;
+  const pending = purchases.filter((p) => p.status === "pending").length;
 
   const stats = [
     { label: "TOTAL REVENUE", value: `$${revenue.toFixed(2)}`, icon: DollarSign },

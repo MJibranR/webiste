@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { SectionTitle } from "@/components/shell";
 import { useAuth } from "@/lib/auth";
-import { useLive } from "@/lib/use-live";
+import { fetchPurchases, type Purchase } from "@/lib/spiderhex";
 
 export const Route = createFileRoute("/dashboard/purchases")({
   component: () => (
@@ -22,9 +24,40 @@ export const Route = createFileRoute("/dashboard/purchases")({
 
 function Purchases() {
   const { user } = useAuth();
-  const { purchases } = useLive();
+  const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadPurchases() {
+      if (!user) return;
+      setLoading(true);
+      try {
+        const data = await fetchPurchases();
+        const userPurchases = data.filter((p) => p.userId === user.id);
+        setPurchases(userPurchases);
+      } catch (error) {
+        console.error('Error loading purchases:', error);
+        toast.error('Failed to load purchases');
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadPurchases();
+  }, [user]);
+
   if (!user) return null;
-  const mine = [...purchases.filter((p) => p.userId === user.id)].reverse();
+
+  if (loading) {
+    return (
+      <DashboardShell>
+        <div className="flex justify-center items-center py-20">
+          <p className="text-sm text-muted-foreground">LOADING...</p>
+        </div>
+      </DashboardShell>
+    );
+  }
+
+  const mine = [...purchases].reverse();
 
   return (
     <>
@@ -56,7 +89,9 @@ function Purchases() {
                   <td className="p-4">
                     <span
                       className={`rounded border px-2 py-1 text-[10px] ${
-                        p.status === "active" ? "border-primary/60 text-primary" : "border-danger/60 text-danger"
+                        p.status === "active" ? "border-primary/60 text-primary" : 
+                        p.status === "pending" ? "border-gold/60 text-gold" :
+                        "border-danger/60 text-danger"
                       }`}
                     >
                       {p.status.toUpperCase()}

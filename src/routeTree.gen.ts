@@ -15,6 +15,7 @@ import { Route as SignupRouteImport } from './routes/signup'
 import { Route as StoreRouteImport } from './routes/store'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminActivityRouteImport } from './routes/admin/activity'
+import { Route as AdminCategoriesRouteImport } from './routes/admin/categories'
 import { Route as AdminContentRouteImport } from './routes/admin/content'
 import { Route as AdminDownloadsRouteImport } from './routes/admin/downloads'
 import { Route as AdminNotificationsRouteImport } from './routes/admin/notifications'
@@ -25,6 +26,7 @@ import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
 import { Route as DashboardDownloadsRouteImport } from './routes/dashboard/downloads'
 import { Route as DashboardPurchasesRouteImport } from './routes/dashboard/purchases'
 import { Route as DashboardRedeemRouteImport } from './routes/dashboard/redeem'
+import { Route as ProductIdRouteImport } from './routes/product/$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -54,6 +56,11 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
 const AdminActivityRoute = AdminActivityRouteImport.update({
   id: '/admin/activity',
   path: '/admin/activity',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminCategoriesRoute = AdminCategoriesRouteImport.update({
+  id: '/admin/categories',
+  path: '/admin/categories',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminContentRoute = AdminContentRouteImport.update({
@@ -106,6 +113,11 @@ const DashboardRedeemRoute = DashboardRedeemRouteImport.update({
   path: '/dashboard/redeem',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProductIdRoute = ProductIdRouteImport.update({
+  id: '/product/$id',
+  path: '/product/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -113,6 +125,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/store': typeof StoreRoute
   '/admin/activity': typeof AdminActivityRoute
+  '/admin/categories': typeof AdminCategoriesRoute
   '/admin/content': typeof AdminContentRoute
   '/admin/downloads': typeof AdminDownloadsRoute
   '/admin/notifications': typeof AdminNotificationsRoute
@@ -122,6 +135,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/downloads': typeof DashboardDownloadsRoute
   '/dashboard/purchases': typeof DashboardPurchasesRoute
   '/dashboard/redeem': typeof DashboardRedeemRoute
+  '/product/$id': typeof ProductIdRoute
   '/admin/': typeof AdminIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
 }
@@ -131,6 +145,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/store': typeof StoreRoute
   '/admin/activity': typeof AdminActivityRoute
+  '/admin/categories': typeof AdminCategoriesRoute
   '/admin/content': typeof AdminContentRoute
   '/admin/downloads': typeof AdminDownloadsRoute
   '/admin/notifications': typeof AdminNotificationsRoute
@@ -140,6 +155,7 @@ export interface FileRoutesByTo {
   '/dashboard/downloads': typeof DashboardDownloadsRoute
   '/dashboard/purchases': typeof DashboardPurchasesRoute
   '/dashboard/redeem': typeof DashboardRedeemRoute
+  '/product/$id': typeof ProductIdRoute
   '/admin': typeof AdminIndexRoute
   '/dashboard': typeof DashboardIndexRoute
 }
@@ -150,6 +166,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/store': typeof StoreRoute
   '/admin/activity': typeof AdminActivityRoute
+  '/admin/categories': typeof AdminCategoriesRoute
   '/admin/content': typeof AdminContentRoute
   '/admin/downloads': typeof AdminDownloadsRoute
   '/admin/notifications': typeof AdminNotificationsRoute
@@ -159,6 +176,7 @@ export interface FileRoutesById {
   '/dashboard/downloads': typeof DashboardDownloadsRoute
   '/dashboard/purchases': typeof DashboardPurchasesRoute
   '/dashboard/redeem': typeof DashboardRedeemRoute
+  '/product/$id': typeof ProductIdRoute
   '/admin/': typeof AdminIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
 }
@@ -170,6 +188,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/store'
     | '/admin/activity'
+    | '/admin/categories'
     | '/admin/content'
     | '/admin/downloads'
     | '/admin/notifications'
@@ -179,6 +198,7 @@ export interface FileRouteTypes {
     | '/dashboard/downloads'
     | '/dashboard/purchases'
     | '/dashboard/redeem'
+    | '/product/$id'
     | '/admin/'
     | '/dashboard/'
   fileRoutesByTo: FileRoutesByTo
@@ -188,6 +208,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/store'
     | '/admin/activity'
+    | '/admin/categories'
     | '/admin/content'
     | '/admin/downloads'
     | '/admin/notifications'
@@ -197,6 +218,7 @@ export interface FileRouteTypes {
     | '/dashboard/downloads'
     | '/dashboard/purchases'
     | '/dashboard/redeem'
+    | '/product/$id'
     | '/admin'
     | '/dashboard'
   id:
@@ -206,6 +228,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/store'
     | '/admin/activity'
+    | '/admin/categories'
     | '/admin/content'
     | '/admin/downloads'
     | '/admin/notifications'
@@ -215,6 +238,7 @@ export interface FileRouteTypes {
     | '/dashboard/downloads'
     | '/dashboard/purchases'
     | '/dashboard/redeem'
+    | '/product/$id'
     | '/admin/'
     | '/dashboard/'
   fileRoutesById: FileRoutesById
@@ -225,6 +249,7 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute
   StoreRoute: typeof StoreRoute
   AdminActivityRoute: typeof AdminActivityRoute
+  AdminCategoriesRoute: typeof AdminCategoriesRoute
   AdminContentRoute: typeof AdminContentRoute
   AdminDownloadsRoute: typeof AdminDownloadsRoute
   AdminNotificationsRoute: typeof AdminNotificationsRoute
@@ -234,6 +259,7 @@ export interface RootRouteChildren {
   DashboardDownloadsRoute: typeof DashboardDownloadsRoute
   DashboardPurchasesRoute: typeof DashboardPurchasesRoute
   DashboardRedeemRoute: typeof DashboardRedeemRoute
+  ProductIdRoute: typeof ProductIdRoute
   AdminIndexRoute: typeof AdminIndexRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
 }
@@ -280,6 +306,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/activity'
       fullPath: '/admin/activity'
       preLoaderRoute: typeof AdminActivityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/categories': {
+      id: '/admin/categories'
+      path: '/admin/categories'
+      fullPath: '/admin/categories'
+      preLoaderRoute: typeof AdminCategoriesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/content': {
@@ -352,6 +385,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRedeemRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/product/$id': {
+      id: '/product/$id'
+      path: '/product/$id'
+      fullPath: '/product/$id'
+      preLoaderRoute: typeof ProductIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -361,6 +401,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   StoreRoute: StoreRoute,
   AdminActivityRoute: AdminActivityRoute,
+  AdminCategoriesRoute: AdminCategoriesRoute,
   AdminContentRoute: AdminContentRoute,
   AdminDownloadsRoute: AdminDownloadsRoute,
   AdminNotificationsRoute: AdminNotificationsRoute,
@@ -370,6 +411,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardDownloadsRoute: DashboardDownloadsRoute,
   DashboardPurchasesRoute: DashboardPurchasesRoute,
   DashboardRedeemRoute: DashboardRedeemRoute,
+  ProductIdRoute: ProductIdRoute,
   AdminIndexRoute: AdminIndexRoute,
   DashboardIndexRoute: DashboardIndexRoute,
 }

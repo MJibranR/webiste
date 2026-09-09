@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { AdminShell } from "@/components/admin-shell";
 import { SectionTitle } from "@/components/shell";
-import { clearActivity, getActivity, type ActivityLog, type ActivityType } from "@/lib/spiderhex";
+import { fetchActivity, clearActivity, type ActivityLog, type ActivityType } from "@/lib/spiderhex";
 
 export const Route = createFileRoute("/admin/activity")({
   component: () => (
@@ -14,10 +15,6 @@ export const Route = createFileRoute("/admin/activity")({
     meta: [
       { title: "Activity Log — SPIDER HEX Admin" },
       { name: "description", content: "Live log of logins, signups, orders, panel edits and wallet changes." },
-      { property: "og:title", content: "Activity Log — SPIDER HEX Admin" },
-      { property: "og:description", content: "Every action on SPIDER HEX in one timeline." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
 });
@@ -25,6 +22,7 @@ export const Route = createFileRoute("/admin/activity")({
 const FILTERS: (ActivityType | "all")[] = [
   "all",
   "login",
+  "logout",
   "signup",
   "purchase",
   "download",
@@ -50,21 +48,44 @@ const color: Record<string, string> = {
 function ActivityAdmin() {
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [filter, setFilter] = useState<ActivityType | "all">("all");
+  const [loading, setLoading] = useState(true);
 
-  const sync = useCallback(() => setLogs(getActivity()), []);
+  const sync = useCallback(async () => {
+    try {
+      const data = await fetchActivity();
+      setLogs(data);
+    } catch (error) {
+      console.error('Error loading activity:', error);
+      toast.error('Failed to load activity');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     sync();
-    const handler = () => sync();
-    window.addEventListener("sh:update", handler);
-    window.addEventListener("storage", handler);
-    return () => {
-      window.removeEventListener("sh:update", handler);
-      window.removeEventListener("storage", handler);
-    };
   }, [sync]);
 
+  const handleClear = async () => {
+    if (window.confirm("Clear the whole activity log?")) {
+      await clearActivity();
+      await sync();
+      toast.success("LOG CLEARED");
+    }
+  };
+
   const list = filter === "all" ? logs : logs.filter((l) => l.type === filter);
+
+  if (loading) {
+    return (
+      <AdminShell>
+        <SectionTitle sub="// SYSTEM TIMELINE">ACTIVITY LOG</SectionTitle>
+        <div className="flex justify-center items-center py-20">
+          <p className="text-sm text-muted-foreground">LOADING...</p>
+        </div>
+      </AdminShell>
+    );
+  }
 
   return (
     <>
@@ -85,12 +106,7 @@ function ActivityAdmin() {
           </button>
         ))}
         <button
-          onClick={() => {
-            if (window.confirm("Clear the whole activity log?")) {
-              clearActivity();
-              sync();
-            }
-          }}
+          onClick={handleClear}
           className="ml-auto rounded border border-danger/50 px-3 py-2 text-danger hover:bg-danger/10"
         >
           CLEAR LOG

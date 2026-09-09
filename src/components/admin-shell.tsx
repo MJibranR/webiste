@@ -12,30 +12,35 @@ export function AdminShell({ children }: { children: ReactNode }) {
     if (!loading && (!user || user.role !== "admin")) navigate({ to: "/login" });
   }, [loading, user, navigate]);
 
+  // ✅ FIX: Show loading state without rendering the full layout
   if (loading || !user || user.role !== "admin") {
     return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-danger">
-        VERIFYING ADMIN CLEARANCE<span className="status-dot ml-2" />
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="text-4xl mb-4">🕷️</div>
+          <p className="text-sm text-muted-foreground">VERIFYING ADMIN CLEARANCE...</p>
+        </div>
       </div>
     );
   }
 
-const nav = [
-  { to: "/admin", label: "OVERVIEW" },
-  { to: "/admin/products", label: "PRODUCTS" },
-  { to: "/admin/downloads", label: "DOWNLOADS" },
-  { to: "/admin/redeem", label: "REDEEM CODES" },
-  { to: "/admin/users", label: "USERS" },
-  { to: "/admin/content", label: "SITE CONTENT" },
-  { to: "/admin/notifications", label: "NOTIFICATIONS" },
-  { to: "/admin/activity", label: "ACTIVITY" },
-] as const;
+  const nav = [
+    { to: "/admin", label: "OVERVIEW" },
+    { to: "/admin/products", label: "PRODUCTS" },
+    { to: "/admin/downloads", label: "DOWNLOADS" },
+    { to: "/admin/redeem", label: "REDEEM CODES" },
+    { to: "/admin/categories", label: "CATEGORIES" },
+    { to: "/admin/users", label: "USERS" },
+    { to: "/admin/content", label: "SITE CONTENT" },
+    { to: "/admin/notifications", label: "NOTIFICATIONS" },
+    { to: "/admin/activity", label: "ACTIVITY" },
+  ] as const;
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-background">
       <Scanlines />
       <MatrixRain />
-      <header className="border-b border-gold/30 bg-background/85 backdrop-blur">
+      <header className="border-b border-gold/30 bg-background/85 backdrop-blur sticky top-0 z-40">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3">
           <div className="flex items-center gap-3">
             <Logo size="text-base" />

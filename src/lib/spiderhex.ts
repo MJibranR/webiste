@@ -1,10 +1,128 @@
 import { supabase } from "@/integrations/supabase/client";
-import { cachedSettings, DEFAULT_SETTINGS, type SiteSettings, type VideoItem } from "./settings";
+import { DEFAULT_SETTINGS, type SiteSettings, type VideoItem } from "./settings";
 
+// Re-export settings types
 export type { SiteSettings, VideoItem };
 export { DEFAULT_SETTINGS };
 
 export type Role = "admin" | "user";
+
+
+
+// ---------------- CATEGORIES ----------------
+
+export interface Category {
+  id: string;
+  name: string;
+  display_name: string;
+  sort_order: number;
+  created_at?: string;
+}
+
+// ---------------- USERS (from database) ----------------
+
+export async function fetchUsers(): Promise<User[]> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .order('created_at', { ascending: false });
+  
+  if (error) {
+    console.error('Error fetching users:', error);
+    return [];
+  }
+  
+  // Get roles for users
+  const { data: rolesData, error: rolesError } = await supabase
+    .from('user_roles')
+    .select('*');
+  
+  if (rolesError) {
+    console.error('Error fetching roles:', rolesError);
+    // Return users with default 'user' role
+    return (data || []).map((p: any) => ({
+      id: p.id,
+      email: p.email || '',
+      fullName: p.full_name || '',
+      whatsapp: p.whatsapp || '',
+      role: 'user' as Role,
+      balance: p.balance || 0,
+      totalSpent: p.total_spent || 0,
+      level: p.level || 1,
+      xp: p.xp || 0,
+      username: p.username || '',
+    }));
+  }
+  
+  // Merge roles with profiles
+  return (data || []).map((p: any) => {
+    const roleData = rolesData?.find((r: any) => r.user_id === p.id);
+    return {
+      id: p.id,
+      email: p.email || '',
+      fullName: p.full_name || '',
+      whatsapp: p.whatsapp || '',
+      role: roleData?.role || 'user',
+      balance: p.balance || 0,
+      totalSpent: p.total_spent || 0,
+      level: p.level || 1,
+      xp: p.xp || 0,
+      username: p.username || '',
+    };
+  });
+}
+
+export async function fetchCategories(): Promise<Category[]> {
+  const { data, error } = await supabase
+    .from('categories')
+    .select('*')
+    .order('sort_order', { ascending: true });
+  
+  if (error) {
+    console.error('Error fetching categories:', error);
+    return [];
+  }
+  return data || [];
+}
+
+export async function createCategory(name: string, displayName: string): Promise<string | null> {
+  const id = name.toLowerCase().replace(/\s+/g, '_');
+  const { error } = await supabase
+    .from('categories')
+    .insert({ id, name, display_name: displayName });
+  
+  if (error) {
+    console.error('Error creating category:', error);
+    return error.message;
+  }
+  return null;
+}
+
+export async function updateCategory(id: string, displayName: string): Promise<string | null> {
+  const { error } = await supabase
+    .from('categories')
+    .update({ display_name: displayName })
+    .eq('id', id);
+  
+  if (error) {
+    console.error('Error updating category:', error);
+    return error.message;
+  }
+  return null;
+}
+
+export async function deleteCategory(id: string): Promise<string | null> {
+  const { error } = await supabase
+    .from('categories')
+    .delete()
+    .eq('id', id);
+  
+  if (error) {
+    console.error('Error deleting category:', error);
+    return error.message;
+  }
+  return null;
+}
 
 export interface User {
   id: string;
@@ -18,6 +136,70 @@ export interface User {
   level: number;
   xp: number;
   username: string;
+}
+
+export interface Product {
+  id: string;
+  name: string;
+  price: number;
+  priceMonthly: number | null;
+  priceWeekly: number | null;
+  category: string;
+  badge: string;
+  inStock: boolean;
+  downloadLink: string;
+  imageUrl: string;
+  description: string;
+  videoUrl: string;
+}
+
+// ---------------- USERS (localStorage fallback for auth) ----------------
+
+export function getUsers(): User[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const data = localStorage.getItem('sh_users');
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function setUsers(users: User[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem('sh_users', JSON.stringify(users));
+    notify();
+  } catch {
+    // ignore
+  }
+}
+
+// ---------------- PURCHASES (localStorage fallback) ----------------
+
+export function getPurchases(): Purchase[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const data = localStorage.getItem('sh_purchases');
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function setPurchases(purchases: Purchase[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem('sh_purchases', JSON.stringify(purchases));
+    notify();
+  } catch {
+    // ignore
+  }
+}
+
+export function getUserByEmail(email: string): User | undefined {
+  const users = getUsers();
+  return users.find(u => u.email === email);
 }
 
 /** One row inside the download popup (label + tag + url). */
@@ -86,15 +268,6 @@ export interface ActivityLog {
   message: string;
   date: string;
 }
-
-export const CATEGORIES = [
-  "ALL",
-  "PC PANEL",
-  "NON ROOT",
-  "ROOT",
-  "IOS PANEL",
-  "OTHERS ITEM",
-] as const;
 
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
@@ -242,35 +415,63 @@ export async function createPurchase(input: {
   credentials?: string;
   isRedeem?: boolean;
 }): Promise<string | null> {
-  const { error } = await supabase.from("purchases").insert({
-    user_id: input.userId,
-    product_id: input.productId || null,
-    product_name: input.productName,
-    plan: input.plan ?? "LIFETIME",
-    price: input.price,
-    status: input.status ?? "pending",
-    download_link: input.downloadLink ?? "",
-    files: (input.files ?? []) as never,
-    credentials: input.credentials ?? "",
-    is_redeem: input.isRedeem ?? false,
-  });
-  if (error) console.error("Error creating purchase:", error);
-  notify();
-  return error ? error.message : null;
+  try {
+    const insertData = {
+      user_id: input.userId,
+      product_id: input.productId || null,
+      product_name: input.productName,
+      plan: input.plan ?? "LIFETIME",
+      price: input.price,
+      status: input.status ?? "pending",
+      download_link: input.downloadLink ?? "",
+      files: (input.files ?? []) as any,
+      credentials: input.credentials ?? "",
+      is_redeem: input.isRedeem ?? false,
+    };
+    
+    const { error } = await supabase
+      .from("purchases")
+      .insert(insertData);
+    
+    if (error) {
+      console.error("Error creating purchase:", error);
+      notify();
+      return error.message;
+    }
+    notify();
+    return null;
+  } catch (err: any) {
+    console.error("Error creating purchase:", err);
+    return err.message || "Unknown error";
+  }
 }
 
 export async function updatePurchase(
   id: string,
-  patch: { status?: Purchase["status"]; files?: DownloadFile[]; downloadLink?: string },
+  patch: { status?: Purchase["status"]; files?: DownloadFile[]; downloadLink?: string }
 ): Promise<string | null> {
-  const payload: Record<string, unknown> = {};
-  if (patch.status) payload["status"] = patch.status;
-  if (patch.files) payload["files"] = patch.files;
-  if (patch.downloadLink !== undefined) payload["download_link"] = patch.downloadLink;
-  const { error } = await supabase.from("purchases").update(payload).eq("id", id);
-  if (error) console.error("Error updating purchase:", error);
-  notify();
-  return error ? error.message : null;
+  try {
+    const payload: any = {};
+    if (patch.status !== undefined) payload.status = patch.status;
+    if (patch.files !== undefined) payload.files = patch.files;
+    if (patch.downloadLink !== undefined) payload.download_link = patch.downloadLink;
+    
+    const { error } = await supabase
+      .from("purchases")
+      .update(payload)
+      .eq("id", id);
+    
+    if (error) {
+      console.error("Error updating purchase:", error);
+      notify();
+      return error.message;
+    }
+    notify();
+    return null;
+  } catch (err: any) {
+    console.error("Error updating purchase:", err);
+    return err.message || "Unknown error";
+  }
 }
 
 // ---------------- NOTIFICATIONS ----------------
@@ -374,8 +575,7 @@ const fill = (template: string, vars: Record<string, string>) =>
   template.replace(/\{(\w+)\}/g, (_, k: string) => vars[k] ?? "");
 
 export const waLink = (message: string, number?: string) => {
-  const digits = (number ?? cachedSettings().whatsappNumber).replace(/\D/g, "");
-  const base = digits ? `https://wa.me/${digits}` : "https://wa.me/";
+  const base = "https://wa.me/";
   return `${base}?text=${encodeURIComponent(message)}`;
 };
 
@@ -385,18 +585,18 @@ export async function discordCopy(message: string) {
   } catch {
     /* clipboard blocked */
   }
-  window.open(cachedSettings().discordUrl || "https://discord.com/app", "_blank", "noopener");
+  window.open("https://discord.com/app", "_blank", "noopener");
 }
 
 export const buyMessage = (name: string, product: string, price: number, plan?: string) => {
-  const s = cachedSettings();
-  const base = fill(s.buyTemplate, { name, product, price: String(price), brand: s.brandName });
+  const template = "Hello I'm {name} I want to buy {product} for ${price} USD thank you!";
+  const base = fill(template, { name, product, price: String(price), brand: "SPIDER HEX" });
   return plan ? `${base}\nPlan: ${plan}` : base;
 };
 
 export const topUpMessage = (name: string, email: string, amount: number) => {
-  const s = cachedSettings();
-  return fill(s.topUpTemplate, { name, email, amount: String(amount), brand: s.brandName });
+  const template = "Hello I'm {name} ({email}) I want to top up my {brand} wallet with ${amount} USD thank you!";
+  return fill(template, { name, email, amount: String(amount), brand: "SPIDER HEX" });
 };
 
 // ---------------- USER HELPERS ----------------
