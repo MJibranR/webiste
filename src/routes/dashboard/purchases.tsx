@@ -16,8 +16,6 @@ export const Route = createFileRoute("/dashboard/purchases")({
     meta: [
       { title: "Purchase History — SPIDER HEX" },
       { name: "description", content: "Review every SPIDER HEX panel purchase with price, date and license status." },
-      { property: "og:title", content: "Purchase History — SPIDER HEX" },
-      { property: "og:description", content: "Every order you have placed on SPIDER HEX." },
     ],
   }),
 });
@@ -29,12 +27,18 @@ function Purchases() {
 
   useEffect(() => {
     async function loadPurchases() {
-      if (!user) return;
+      // ✅ Check if user exists before making the API call
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+      
       setLoading(true);
       try {
         const data = await fetchPurchases();
         const userPurchases = data.filter((p) => p.userId === user.id);
         setPurchases(userPurchases);
+        console.log('📦 Purchase history loaded:', userPurchases);
       } catch (error) {
         console.error('Error loading purchases:', error);
         toast.error('Failed to load purchases');
@@ -43,9 +47,16 @@ function Purchases() {
       }
     }
     loadPurchases();
-  }, [user]);
+  }, [user]); // ✅ user is the dependency, but we check inside
 
-  if (!user) return null;
+  // ✅ If user is null, show login message
+  if (!user) {
+    return (
+      <div className="flex justify-center items-center py-20">
+        <p className="text-sm text-muted-foreground">PLEASE LOGIN TO VIEW PURCHASES</p>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
