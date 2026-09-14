@@ -38,6 +38,95 @@ export type Database = {
         }
         Relationships: []
       }
+      categories: {
+        Row: {
+          created_at: string | null
+          display_name: string
+          id: string
+          name: string
+          sort_order: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          display_name: string
+          id: string
+          name: string
+          sort_order?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          display_name?: string
+          id?: string
+          name?: string
+          sort_order?: number | null
+        }
+        Relationships: []
+      }
+      deposits: {
+        Row: {
+          admin_note: string
+          amount_bdt: number
+          amount_usd: number
+          created_at: string
+          id: string
+          method_id: string | null
+          method_name: string
+          note: string
+          rate: number
+          reference: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          sender_info: string
+          status: string
+          user_email: string
+          user_id: string
+        }
+        Insert: {
+          admin_note?: string
+          amount_bdt?: number
+          amount_usd: number
+          created_at?: string
+          id?: string
+          method_id?: string | null
+          method_name?: string
+          note?: string
+          rate?: number
+          reference?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          sender_info?: string
+          status?: string
+          user_email?: string
+          user_id: string
+        }
+        Update: {
+          admin_note?: string
+          amount_bdt?: number
+          amount_usd?: number
+          created_at?: string
+          id?: string
+          method_id?: string | null
+          method_name?: string
+          note?: string
+          rate?: number
+          reference?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          sender_info?: string
+          status?: string
+          user_email?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deposits_method_id_fkey"
+            columns: ["method_id"]
+            isOneToOne: false
+            referencedRelation: "payment_methods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string
@@ -65,10 +154,115 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_methods: {
+        Row: {
+          account_label: string
+          account_value: string
+          created_at: string
+          enabled: boolean
+          id: string
+          instructions: string
+          logo_emoji: string
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          account_label?: string
+          account_value?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          instructions?: string
+          logo_emoji?: string
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          account_label?: string
+          account_value?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          instructions?: string
+          logo_emoji?: string
+          name?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      payment_settings: {
+        Row: {
+          id: string
+          min_deposit_usd: number
+          tutorial_heading: string
+          tutorial_text: string
+          tutorial_video_url: string
+          updated_at: string
+          usd_to_bdt: number
+        }
+        Insert: {
+          id?: string
+          min_deposit_usd?: number
+          tutorial_heading?: string
+          tutorial_text?: string
+          tutorial_video_url?: string
+          updated_at?: string
+          usd_to_bdt?: number
+        }
+        Update: {
+          id?: string
+          min_deposit_usd?: number
+          tutorial_heading?: string
+          tutorial_text?: string
+          tutorial_video_url?: string
+          updated_at?: string
+          usd_to_bdt?: number
+        }
+        Relationships: []
+      }
+      product_durations: {
+        Row: {
+          created_at: string
+          days: number
+          id: string
+          label: string
+          price: number
+          product_id: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          days?: number
+          id?: string
+          label: string
+          price?: number
+          product_id: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          days?: number
+          id?: string
+          label?: string
+          price?: number
+          product_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_durations_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           badge: string
           category: string
+          category_id: string | null
           created_at: string
           description: string
           download_link: string
@@ -77,7 +271,7 @@ export type Database = {
           image_url: string | null
           in_stock: boolean
           name: string
-          price: number
+          price: number | null
           price_monthly: number | null
           price_weekly: number | null
           video_url: string
@@ -85,6 +279,7 @@ export type Database = {
         Insert: {
           badge?: string
           category: string
+          category_id?: string | null
           created_at?: string
           description?: string
           download_link?: string
@@ -93,7 +288,7 @@ export type Database = {
           image_url?: string | null
           in_stock?: boolean
           name: string
-          price: number
+          price?: number | null
           price_monthly?: number | null
           price_weekly?: number | null
           video_url?: string
@@ -101,6 +296,7 @@ export type Database = {
         Update: {
           badge?: string
           category?: string
+          category_id?: string | null
           created_at?: string
           description?: string
           download_link?: string
@@ -109,12 +305,20 @@ export type Database = {
           image_url?: string | null
           in_stock?: boolean
           name?: string
-          price?: number
+          price?: number | null
           price_monthly?: number | null
           price_weekly?: number | null
           video_url?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "products_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -124,6 +328,7 @@ export type Database = {
           full_name: string | null
           id: string
           level: number
+          total_deposited: number
           total_spent: number
           username: string | null
           whatsapp: string | null
@@ -136,6 +341,7 @@ export type Database = {
           full_name?: string | null
           id: string
           level?: number
+          total_deposited?: number
           total_spent?: number
           username?: string | null
           whatsapp?: string | null
@@ -148,6 +354,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           level?: number
+          total_deposited?: number
           total_spent?: number
           username?: string | null
           whatsapp?: string | null
@@ -159,6 +366,8 @@ export type Database = {
         Row: {
           credentials: string
           download_link: string
+          duration_id: string | null
+          expires_at: string | null
           files: Json
           id: string
           is_redeem: boolean
@@ -167,12 +376,15 @@ export type Database = {
           product_id: string | null
           product_name: string
           purchase_date: string
+          redeem_code: string | null
           status: string
           user_id: string
         }
         Insert: {
           credentials?: string
           download_link?: string
+          duration_id?: string | null
+          expires_at?: string | null
           files?: Json
           id?: string
           is_redeem?: boolean
@@ -181,12 +393,15 @@ export type Database = {
           product_id?: string | null
           product_name?: string
           purchase_date?: string
+          redeem_code?: string | null
           status?: string
           user_id: string
         }
         Update: {
           credentials?: string
           download_link?: string
+          duration_id?: string | null
+          expires_at?: string | null
           files?: Json
           id?: string
           is_redeem?: boolean
@@ -195,6 +410,7 @@ export type Database = {
           product_id?: string | null
           product_name?: string
           purchase_date?: string
+          redeem_code?: string | null
           status?: string
           user_id?: string
         }
@@ -216,6 +432,7 @@ export type Database = {
           product_name: string
           usage_count: number | null
           usage_limit: number | null
+          used_by: Json | null
         }
         Insert: {
           access_key?: string
@@ -232,6 +449,7 @@ export type Database = {
           product_name?: string
           usage_count?: number | null
           usage_limit?: number | null
+          used_by?: Json | null
         }
         Update: {
           access_key?: string
@@ -248,6 +466,7 @@ export type Database = {
           product_name?: string
           usage_count?: number | null
           usage_limit?: number | null
+          used_by?: Json | null
         }
         Relationships: []
       }
@@ -269,6 +488,21 @@ export type Database = {
           id: string
           logo_emoji: string | null
           logo_image_url: string | null
+          product_page_badge_1_desc: string | null
+          product_page_badge_1_icon: string | null
+          product_page_badge_1_title: string | null
+          product_page_badge_2_desc: string | null
+          product_page_badge_2_icon: string | null
+          product_page_badge_2_title: string | null
+          product_page_badge_3_desc: string | null
+          product_page_badge_3_icon: string | null
+          product_page_badge_3_title: string | null
+          product_page_discord_label: string | null
+          product_page_dummy_image: string | null
+          product_page_dummy_video: string | null
+          product_page_heading: string | null
+          product_page_support_text: string | null
+          product_page_telegram_label: string | null
           secure_heading: string | null
           secure_text: string | null
           stats: Json | null
@@ -298,6 +532,21 @@ export type Database = {
           id?: string
           logo_emoji?: string | null
           logo_image_url?: string | null
+          product_page_badge_1_desc?: string | null
+          product_page_badge_1_icon?: string | null
+          product_page_badge_1_title?: string | null
+          product_page_badge_2_desc?: string | null
+          product_page_badge_2_icon?: string | null
+          product_page_badge_2_title?: string | null
+          product_page_badge_3_desc?: string | null
+          product_page_badge_3_icon?: string | null
+          product_page_badge_3_title?: string | null
+          product_page_discord_label?: string | null
+          product_page_dummy_image?: string | null
+          product_page_dummy_video?: string | null
+          product_page_heading?: string | null
+          product_page_support_text?: string | null
+          product_page_telegram_label?: string | null
           secure_heading?: string | null
           secure_text?: string | null
           stats?: Json | null
@@ -327,6 +576,21 @@ export type Database = {
           id?: string
           logo_emoji?: string | null
           logo_image_url?: string | null
+          product_page_badge_1_desc?: string | null
+          product_page_badge_1_icon?: string | null
+          product_page_badge_1_title?: string | null
+          product_page_badge_2_desc?: string | null
+          product_page_badge_2_icon?: string | null
+          product_page_badge_2_title?: string | null
+          product_page_badge_3_desc?: string | null
+          product_page_badge_3_icon?: string | null
+          product_page_badge_3_title?: string | null
+          product_page_discord_label?: string | null
+          product_page_dummy_image?: string | null
+          product_page_dummy_video?: string | null
+          product_page_heading?: string | null
+          product_page_support_text?: string | null
+          product_page_telegram_label?: string | null
           secure_heading?: string | null
           secure_text?: string | null
           stats?: Json | null
@@ -359,6 +623,42 @@ export type Database = {
         }
         Relationships: []
       }
+      wallet_transactions: {
+        Row: {
+          amount: number
+          balance_after: number
+          created_at: string
+          id: string
+          kind: string
+          note: string
+          source_id: string | null
+          source_type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          balance_after?: number
+          created_at?: string
+          id?: string
+          kind?: string
+          note?: string
+          source_id?: string | null
+          source_type?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          created_at?: string
+          id?: string
+          kind?: string
+          note?: string
+          source_id?: string | null
+          source_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -371,6 +671,33 @@ export type Database = {
         }
         Returns: undefined
       }
+      approve_deposit: {
+        Args: { _admin_note?: string; _deposit_id: string }
+        Returns: {
+          admin_note: string
+          amount_bdt: number
+          amount_usd: number
+          created_at: string
+          id: string
+          method_id: string | null
+          method_name: string
+          note: string
+          rate: number
+          reference: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          sender_info: string
+          status: string
+          user_email: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "deposits"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       ensure_profile: {
         Args: { _full_name?: string; _username?: string; _whatsapp?: string }
         Returns: undefined
@@ -381,6 +708,32 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      purchase_with_wallet: {
+        Args: { _duration_id?: string; _product_id: string }
+        Returns: {
+          credentials: string
+          download_link: string
+          duration_id: string | null
+          expires_at: string | null
+          files: Json
+          id: string
+          is_redeem: boolean
+          plan: string
+          price: number
+          product_id: string | null
+          product_name: string
+          purchase_date: string
+          redeem_code: string | null
+          status: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "purchases"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       redeem_code: {
         Args: { _code: string }
@@ -399,10 +752,38 @@ export type Database = {
           product_name: string
           usage_count: number | null
           usage_limit: number | null
+          used_by: Json | null
         }
         SetofOptions: {
           from: "*"
           to: "redeem_codes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      reject_deposit: {
+        Args: { _admin_note?: string; _deposit_id: string }
+        Returns: {
+          admin_note: string
+          amount_bdt: number
+          amount_usd: number
+          created_at: string
+          id: string
+          method_id: string | null
+          method_name: string
+          note: string
+          rate: number
+          reference: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          sender_info: string
+          status: string
+          user_email: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "deposits"
           isOneToOne: true
           isSetofReturn: false
         }
