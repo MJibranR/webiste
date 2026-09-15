@@ -26,6 +26,7 @@ import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
 import { Route as DashboardDownloadsRouteImport } from './routes/dashboard/downloads'
 import { Route as DashboardPurchasesRouteImport } from './routes/dashboard/purchases'
 import { Route as DashboardRedeemRouteImport } from './routes/dashboard/redeem'
+import { Route as DashboardWalletRouteImport } from './routes/dashboard/wallet'
 import { Route as ProductIdRouteImport } from './routes/product/$id'
 
 const IndexRoute = IndexRouteImport.update({
@@ -113,6 +114,11 @@ const DashboardRedeemRoute = DashboardRedeemRouteImport.update({
   path: '/dashboard/redeem',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardWalletRoute = DashboardWalletRouteImport.update({
+  id: '/dashboard/wallet',
+  path: '/dashboard/wallet',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProductIdRoute = ProductIdRouteImport.update({
   id: '/product/$id',
   path: '/product/$id',
@@ -135,6 +141,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/downloads': typeof DashboardDownloadsRoute
   '/dashboard/purchases': typeof DashboardPurchasesRoute
   '/dashboard/redeem': typeof DashboardRedeemRoute
+  '/dashboard/wallet': typeof DashboardWalletRoute
   '/product/$id': typeof ProductIdRoute
   '/admin/': typeof AdminIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -155,6 +162,7 @@ export interface FileRoutesByTo {
   '/dashboard/downloads': typeof DashboardDownloadsRoute
   '/dashboard/purchases': typeof DashboardPurchasesRoute
   '/dashboard/redeem': typeof DashboardRedeemRoute
+  '/dashboard/wallet': typeof DashboardWalletRoute
   '/product/$id': typeof ProductIdRoute
   '/admin': typeof AdminIndexRoute
   '/dashboard': typeof DashboardIndexRoute
@@ -176,6 +184,7 @@ export interface FileRoutesById {
   '/dashboard/downloads': typeof DashboardDownloadsRoute
   '/dashboard/purchases': typeof DashboardPurchasesRoute
   '/dashboard/redeem': typeof DashboardRedeemRoute
+  '/dashboard/wallet': typeof DashboardWalletRoute
   '/product/$id': typeof ProductIdRoute
   '/admin/': typeof AdminIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -198,6 +207,7 @@ export interface FileRouteTypes {
     | '/dashboard/downloads'
     | '/dashboard/purchases'
     | '/dashboard/redeem'
+    | '/dashboard/wallet'
     | '/product/$id'
     | '/admin/'
     | '/dashboard/'
@@ -218,6 +228,7 @@ export interface FileRouteTypes {
     | '/dashboard/downloads'
     | '/dashboard/purchases'
     | '/dashboard/redeem'
+    | '/dashboard/wallet'
     | '/product/$id'
     | '/admin'
     | '/dashboard'
@@ -238,6 +249,7 @@ export interface FileRouteTypes {
     | '/dashboard/downloads'
     | '/dashboard/purchases'
     | '/dashboard/redeem'
+    | '/dashboard/wallet'
     | '/product/$id'
     | '/admin/'
     | '/dashboard/'
@@ -259,6 +271,7 @@ export interface RootRouteChildren {
   DashboardDownloadsRoute: typeof DashboardDownloadsRoute
   DashboardPurchasesRoute: typeof DashboardPurchasesRoute
   DashboardRedeemRoute: typeof DashboardRedeemRoute
+  DashboardWalletRoute: typeof DashboardWalletRoute
   ProductIdRoute: typeof ProductIdRoute
   AdminIndexRoute: typeof AdminIndexRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
@@ -385,6 +398,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRedeemRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dashboard/wallet': {
+      id: '/dashboard/wallet'
+      path: '/dashboard/wallet'
+      fullPath: '/dashboard/wallet'
+      preLoaderRoute: typeof DashboardWalletRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/product/$id': {
       id: '/product/$id'
       path: '/product/$id'
@@ -411,6 +431,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardDownloadsRoute: DashboardDownloadsRoute,
   DashboardPurchasesRoute: DashboardPurchasesRoute,
   DashboardRedeemRoute: DashboardRedeemRoute,
+  DashboardWalletRoute: DashboardWalletRoute,
   ProductIdRoute: ProductIdRoute,
   AdminIndexRoute: AdminIndexRoute,
   DashboardIndexRoute: DashboardIndexRoute,
