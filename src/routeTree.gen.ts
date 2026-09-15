@@ -17,6 +17,7 @@ import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminActivityRouteImport } from './routes/admin/activity'
 import { Route as AdminCategoriesRouteImport } from './routes/admin/categories'
 import { Route as AdminContentRouteImport } from './routes/admin/content'
+import { Route as AdminDepositsRouteImport } from './routes/admin/deposits'
 import { Route as AdminDownloadsRouteImport } from './routes/admin/downloads'
 import { Route as AdminNotificationsRouteImport } from './routes/admin/notifications'
 import { Route as AdminProductsRouteImport } from './routes/admin/products'
@@ -67,6 +68,11 @@ const AdminCategoriesRoute = AdminCategoriesRouteImport.update({
 const AdminContentRoute = AdminContentRouteImport.update({
   id: '/admin/content',
   path: '/admin/content',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminDepositsRoute = AdminDepositsRouteImport.update({
+  id: '/admin/deposits',
+  path: '/admin/deposits',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminDownloadsRoute = AdminDownloadsRouteImport.update({
@@ -133,6 +139,7 @@ export interface FileRoutesByFullPath {
   '/admin/activity': typeof AdminActivityRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/content': typeof AdminContentRoute
+  '/admin/deposits': typeof AdminDepositsRoute
   '/admin/downloads': typeof AdminDownloadsRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/products': typeof AdminProductsRoute
@@ -154,6 +161,7 @@ export interface FileRoutesByTo {
   '/admin/activity': typeof AdminActivityRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/content': typeof AdminContentRoute
+  '/admin/deposits': typeof AdminDepositsRoute
   '/admin/downloads': typeof AdminDownloadsRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/products': typeof AdminProductsRoute
@@ -176,6 +184,7 @@ export interface FileRoutesById {
   '/admin/activity': typeof AdminActivityRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/content': typeof AdminContentRoute
+  '/admin/deposits': typeof AdminDepositsRoute
   '/admin/downloads': typeof AdminDownloadsRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/products': typeof AdminProductsRoute
@@ -199,6 +208,7 @@ export interface FileRouteTypes {
     | '/admin/activity'
     | '/admin/categories'
     | '/admin/content'
+    | '/admin/deposits'
     | '/admin/downloads'
     | '/admin/notifications'
     | '/admin/products'
@@ -220,6 +230,7 @@ export interface FileRouteTypes {
     | '/admin/activity'
     | '/admin/categories'
     | '/admin/content'
+    | '/admin/deposits'
     | '/admin/downloads'
     | '/admin/notifications'
     | '/admin/products'
@@ -241,6 +252,7 @@ export interface FileRouteTypes {
     | '/admin/activity'
     | '/admin/categories'
     | '/admin/content'
+    | '/admin/deposits'
     | '/admin/downloads'
     | '/admin/notifications'
     | '/admin/products'
@@ -263,6 +275,7 @@ export interface RootRouteChildren {
   AdminActivityRoute: typeof AdminActivityRoute
   AdminCategoriesRoute: typeof AdminCategoriesRoute
   AdminContentRoute: typeof AdminContentRoute
+  AdminDepositsRoute: typeof AdminDepositsRoute
   AdminDownloadsRoute: typeof AdminDownloadsRoute
   AdminNotificationsRoute: typeof AdminNotificationsRoute
   AdminProductsRoute: typeof AdminProductsRoute
@@ -333,6 +346,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/content'
       fullPath: '/admin/content'
       preLoaderRoute: typeof AdminContentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/deposits': {
+      id: '/admin/deposits'
+      path: '/admin/deposits'
+      fullPath: '/admin/deposits'
+      preLoaderRoute: typeof AdminDepositsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/downloads': {
@@ -423,6 +443,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminActivityRoute: AdminActivityRoute,
   AdminCategoriesRoute: AdminCategoriesRoute,
   AdminContentRoute: AdminContentRoute,
+  AdminDepositsRoute: AdminDepositsRoute,
   AdminDownloadsRoute: AdminDownloadsRoute,
   AdminNotificationsRoute: AdminNotificationsRoute,
   AdminProductsRoute: AdminProductsRoute,
